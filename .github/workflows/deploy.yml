@@ -1,0 +1,156 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - preview
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy to Cloudflare Workers
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@latest
+
+      - name: Authenticate with Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Create or get D1 database
+        id: d1
+        run: |
+          set -euo pipefail
+          DB_NAME="cs2-inventory-${{ github.event.inputs.environment || 'production' }}"
+          
+          # Try to get existing database
+          EXISTING=$(wrangler d1 list --json 2>/dev/null | jq -r ".[] | select(.name==\"$DB_NAME\") | .uuid" || echo "")
+          
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            DB_ID="$EXISTING"
+            echo "Using existing D1: $DB_ID"
+          else
+            # Create new database
+            CREATE_OUTPUT=$(wrangler d1 create "$DB_NAME" --json 2>&1)
+            DB_ID=$(echo "$CREATE_OUTPUT" | jq -r '.uuid // .id')
+            echo "Created new D1: $DB_ID"
+          fi
+          
+          echo "db_id=$DB_ID" >> $GITHUB_OUTPUT
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create or get KV namespace
+        id: kv
+        run: |
+          set -euo pipefail
+          KV_NAME="CACHE-${{ github.event.inputs.environment || 'production' }}"
+          
+          # Get or create production KV
+          EXISTING_KV=$(wrangler kv namespace list --json 2>/dev/null | jq -r ".[] | select(.title==\"$KV_NAME\") | .id" || echo "")
+          
+          if [ -n "$EXISTING_KV" ] && [ "$EXISTING_KV" != "null" ]; then
+            KV_ID="$EXISTING_KV"
+            echo "Using existing KV: $KV_ID"
+          else
+            CREATE_OUTPUT=$(wrangler kv namespace create "$KV_NAME" --json 2>&1)
+            KV_ID=$(echo "$CREATE_OUTPUT" | jq -r '.id')
+            echo "Created new KV: $KV_ID"
+          fi
+          
+          # Get or create preview KV
+          EXISTING_PREVIEW=$(wrangler kv namespace list --preview --json 2>/dev/null | jq -r ".[] | select(.title==\"$KV_NAME\") | .id" || echo "")
+          
+          if [ -n "$EXISTING_PREVIEW" ] && [ "$EXISTING_PREVIEW" != "null" ]; then
+            KV_PREVIEW_ID="$EXISTING_PREVIEW"
+          else
+            CREATE_PREVIEW=$(wrangler kv namespace create "$KV_NAME" --preview --json 2>&1)
+            KV_PREVIEW_ID=$(echo "$CREATE_PREVIEW" | jq -r '.id')
+          fi
+          
+          echo "kv_id=$KV_ID" >> $GITHUB_OUTPUT
+          echo "kv_preview_id=$KV_PREVIEW_ID" >> $GITHUB_OUTPUT
+
+      - name: Generate wrangler config
+        run: |
+          cat > wrangler.deploy.jsonc <<EOF
+          {
+            "\$schema": "node_modules/wrangler/config-schema.json",
+            "name": "cs2-inventory-simulator",
+            "main": "./workers/app.ts",
+            "compatibility_date": "2025-08-01",
+            "compatibility_flags": ["nodejs_compat"],
+            "assets": {
+              "directory": "./build/client",
+              "binding": "ASSETS"
+            },
+            "observability": { "enabled": true },
+            "d1_databases": [
+              {
+                "binding": "DB",
+                "database_name": "${{ steps.d1.outputs.db_name }}",
+                "database_id": "${{ steps.d1.outputs.db_id }}",
+                "migrations_dir": "./d1-migrations"
+              }
+            ],
+            "kv_namespaces": [
+              {
+                "binding": "CACHE",
+                "id": "${{ steps.kv.outputs.kv_id }}",
+                "preview_id": "${{ steps.kv.outputs.kv_preview_id }}"
+              }
+            ],
+            "vars": { "NODE_ENV": "production" }
+          }
+          EOF
+
+      - name: Apply D1 migrations
+        run: |
+          wrangler d1 migrations apply "${{ steps.d1.outputs.db_name }}" --config wrangler.deploy.jsonc --remote --yes
+
+      - name: Deploy to Cloudflare Workers
+        run: |
+          wrangler deploy --config wrangler.deploy.jsonc --env ${{ github.event.inputs.environment || 'production' }}
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          STEAM_CALLBACK_URL: ${{ secrets.STEAM_CALLBACK_URL }}
+
+      - name: Comment deployment URL
+        if: github.event_name == 'push'
+        run: |
+          WORKER_URL="https://cs2-inventory-simulator.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev"
+          echo "🚀 部署完成！访问: $WORKER_URL"
+          echo "📝 别忘了在 Steam 应用管理页设置 Redirect URI: $WORKER_URL/sign-in/steam/callback"

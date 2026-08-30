@@ -2,6 +2,10 @@
 
 基于 [cs2-inventory-simulator](https://github.com/ianlucas/cs2-inventory-simulator) 移植到 Cloudflare Workers (D1 + KV + Assets) 的全栈版本。
 
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?repository-url=https://github.com/cyqmq/cs2-cfworker-inventory-simulator)
+
+**点击上方按钮 → 授权 GitHub → 自动创建 D1/KV → 部署完成** (约 2-3 分钟)
+
 ## ✨ 特性
 
 - 🎮 **完整 CS2 库存模拟** - 添加/移除皮肤、贴纸、钥匙扣、补丁、命名标签、StatTrak 交换
@@ -14,36 +18,49 @@
 
 ## 🚀 一键部署
 
-### 前置要求
+### 方式 1：点击部署按钮 (最简单，无需本地环境)
 
-- Node.js 20+
-- Cloudflare 账号
-- Steam Web API Key ([申请地址](https://steamcommunity.com/dev/apikey))
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?repository-url=https://github.com/cyqmq/cs2-cfworker-inventory-simulator)
 
-### 自动部署 (推荐)
+**流程**：
+1. 点击上方按钮 → 授权 Cloudflare 访问 GitHub
+2. 选择 Fork 到你的账号 → 点击 "Deploy"
+3. Cloudflare 自动：
+   - ✅ 创建 D1 数据库 `cs2-inventory-db`
+   - ✅ 创建 KV 命名空间 `CACHE`
+   - ✅ 运行数据库迁移
+   - ✅ 构建并部署 Worker
+4. 部署完成后，在 **Settings > Variables** 添加 3 个 Secrets：
+   - `SESSION_SECRET` (随机 32+ 字符，`openssl rand -base64 32`)
+   - `STEAM_API_KEY` (你的 Steam Web API Key)
+   - `STEAM_CALLBACK_URL` (Worker 域名 + `/sign-in/steam/callback`)
+5. 在 Steam 应用管理页设置 Redirect URI 为你的 Worker 域名回调地址
+
+### 方式 2：Fork 后 GitHub Actions 自动部署 (推荐生产)
+
+1. **Fork 本仓库** 到你的 GitHub
+2. 在 Fork 的仓库 **Settings > Secrets and variables > Actions** 添加：
+   ```
+   CLOUDFLARE_API_TOKEN     # Cloudflare API Token (编辑 Workers 权限)
+   CLOUDFLARE_ACCOUNT_ID    # 你的 Cloudflare Account ID
+   SESSION_SECRET           # 随机 32+ 字符
+   STEAM_API_KEY            # Steam Web API Key
+   STEAM_CALLBACK_URL       # https://your-domain.com/sign-in/steam/callback
+   ```
+3. **Settings > Pages > Build and deployment** 设置 Source 为 "GitHub Actions"
+4. 推送到 `main` 分支 → Actions 自动部署
+
+### 方式 3：本地 CLI 部署 (开发调试)
 
 ```bash
-# 1. 克隆仓库
 git clone https://github.com/cyqmq/cs2-cfworker-inventory-simulator.git
 cd cs2-cfworker-inventory-simulator
-
-# 2. 安装依赖
 npm install
-
-# 3. 登录 Cloudflare
 wrangler login
-
-# 4. 一键部署 (自动创建 D1、KV、应用迁移、部署 Worker)
 ./deploy.sh production
 ```
 
-脚本会自动：
-1. ✅ 创建 D1 数据库 `cs2-inventory-production`
-2. ✅ 创建 KV 命名空间 `CACHE-production` (含 preview)
-3. ✅ 生成 `wrangler.production.jsonc` 绑定真实资源 ID
-4. ✅ 远程应用数据库迁移
-5. ✅ 提示设置 Secrets (SESSION_SECRET, STEAM_API_KEY, STEAM_CALLBACK_URL)
-6. ✅ 构建并部署 Worker
+脚本自动创建 D1/KV、应用迁移、部署。
 
 ### 手动部署 (分步了解)
 
