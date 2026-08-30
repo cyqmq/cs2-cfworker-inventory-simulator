@@ -3,7 +3,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "build": "prisma generate && react-router build",
+    "build": "prisma generate && node -e \"const fs=require('fs'); const glob=require('glob'); const files=glob.sync('**/query_compiler_fast_bg.wasm'); if(files.length) { console.log('Found wasm at:', files[0]); require('fs').cpSync(files[0], 'app/generated/prisma/internal/query_compiler_fast_bg.wasm'); console.log('Copied to app/generated/prisma/internal/'); } else { console.error('Wasm not found'); process.exit(1); }\" && react-router build",
     "dev": "react-router dev",
     "format": "prettier . --write",
     "lint": "eslint",
