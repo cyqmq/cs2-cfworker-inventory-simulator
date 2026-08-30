@@ -109,7 +109,7 @@ jobs:
           cat > wrangler.deploy.jsonc <<EOF
           {
             "\$schema": "node_modules/wrangler/config-schema.json",
-            "name": "cs2-inventory-simulator",
+            "name": "cs2-cfworker-inventory-simulator",
             "main": "./workers/app.ts",
             "compatibility_date": "2025-08-01",
             "compatibility_flags": ["nodejs_compat"],
@@ -152,6 +152,6 @@ jobs:
       - name: Comment deployment URL
         if: github.event_name == 'push'
         run: |
-          WORKER_URL="https://cs2-inventory-simulator.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev"
+          WORKER_URL="https://cs2-cfworker-inventory-simulator.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev"
           echo "🚀 部署完成！访问: $WORKER_URL"
           echo "📝 别忘了在 Steam 应用管理页设置 Redirect URI: $WORKER_URL/sign-in/steam/callback"

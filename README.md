@@ -1,11 +1,14 @@
-# 该项目暂停开发，无法突破cloudflare免费版的硬性要求
 # CS2 Inventory Simulator - Cloudflare Workers 版
+
+> ✅ 已突破 Cloudflare 免费版 3MB 限制：Worker 产物 gzip 压缩后 **≈2.99 MB**（低于 3,072 KB 免费上限），已可在免费套餐上正常构建与部署。
 
 基于 [cs2-inventory-simulator](https://github.com/ianlucas/cs2-inventory-simulator) 移植到 Cloudflare Workers (D1 + KV + Assets) 的全栈版本。
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?repository-url=https://github.com/cyqmq/cs2-cfworker-inventory-simulator)
 
 **点击上方按钮 → 授权 GitHub → 自动创建 D1/KV → 部署完成** (约 2-3 分钟)
+
+> ⚠️ 使用下方「方式 2 / 方式 3」时，务必先在仓库配置 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个 Secrets，否则 GitHub Actions 无法通过 Cloudflare 认证，**自动创建/绑定 D1 与 KV 的流程不会执行**（详见「🔑 必读：自动创建 D1/KV 的前提」）。
 
 ## ✨ 特性
 
@@ -50,6 +53,22 @@
    ```
 3. **Settings > Pages > Build and deployment** 设置 Source 为 "GitHub Actions"
 4. 推送到 `main` 分支 → Actions 自动部署
+
+### 🔑 必读：为什么 D1/KV 没有被自动创建/绑定？
+
+`deploy.yml` 里已内置「自动创建/复用 D1 + KV 并绑定到 Worker」的流程：
+1. 获取/创建 D1 数据库（`cs2-inventory-production`）
+2. 获取/创建 KV 命名空间（`CACHE-production`）
+3. 用这些 ID 生成带绑定的 `wrangler.deploy.jsonc`
+4. 应用 D1 迁移并部署 Worker
+
+**但它必须依赖两个 Secrets 完成 Cloudflare 认证**：
+- `CLOUDFLARE_API_TOKEN` —— Cloudflare API Token（需有 `Workers Scripts: Edit`、`D1: Edit`、`Workers KV Storage: Edit` 权限）
+- `CLOUDFLARE_ACCOUNT_ID` —— 你的 Cloudflare 账号 ID（Dashboard 右下角可查）
+
+如果这两个 Secrets **没有配置**（或为空），GitHub Actions 会卡在认证步骤，`whoami` 显示 `You are not authenticated`，**后续创建/绑定 D1、KV 的命令全部未认证而失败**，Worker 即使部署成功也没有 D1/KV 绑定——表现就是「部署成功但没有绑定」。
+
+**配置后**，重新触发部署（重新 push 到 `main` 或手动 Re-run），即可自动创建/复用并绑定 D1 + KV。
 
 ### 方式 3：本地 CLI 部署 (开发调试)
 
@@ -254,11 +273,11 @@ wrangler d1 migrations apply cs2-inventory-production --remote --yes
 ### Q: 如何查看生产日志？
 ```bash
 wrangler tail --format=pretty
-# 或 Dashboard > Workers > cs2-inventory-simulator > Logs
+# 或 Dashboard > Workers > cs2-cfworker-inventory-simulator > Logs
 ```
 
 ### Q: 如何绑定自定义域名？
-Dashboard > Workers > cs2-inventory-simulator > Triggers > Custom Domains > Add Custom Domain。
+Dashboard > Workers > cs2-cfworker-inventory-simulator > Triggers > Custom Domains > Add Custom Domain。
 
 ## 📊 监控与调试
 
