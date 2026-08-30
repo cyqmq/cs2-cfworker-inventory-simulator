@@ -7,6 +7,7 @@ import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { copyFileSync, existsSync } from "fs";
 import { createHash } from "crypto";
 import { readdirSync, readFileSync } from "fs";
 import { resolve } from "path";
@@ -15,6 +16,17 @@ import ts from "typescript";
 import { defineConfig } from "vite";
 
 const wasmSource = resolve(process.cwd(), "app/generated/prisma/internal/query_compiler_fast_bg.wasm");
+
+const copyWasmPlugin = () => ({
+  name: "copy-prisma-wasm",
+  writeBundle(options) {
+    if (existsSync(wasmSource)) {
+      const outDir = options.dir || resolve(process.cwd(), "build");
+      const destDir = resolve(outDir, "app/generated/prisma/internal");
+      copyFileSync(wasmSource, resolve(destDir, "query_compiler_fast_bg.wasm"));
+    }
+  }
+});
 
 export default defineConfig({
   server: {
@@ -36,7 +48,8 @@ export default defineConfig({
         }
       ],
       hook: "buildStart"
-    })
+    }),
+    copyWasmPlugin()
   ],
   define: {
     __SPLASH_SCRIPT__: JSON.stringify(
