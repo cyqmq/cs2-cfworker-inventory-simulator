@@ -13,7 +13,6 @@
 
 import * as runtime from "@prisma/client/runtime/wasm-compiler-edge"
 import type * as Prisma from "./prismaNamespace"
-import queryCompilerWasmModule from "./query_compiler_fast_bg.wasm?module"
 
 
 const config: runtime.GetPrismaClientConfig = {
@@ -41,8 +40,10 @@ config.parameterizationSchema = {
 config.compilerWasm = {
   getRuntime: async () => await import("./query_compiler_fast_bg.js"),
 
-  getQueryCompilerWasmModule: async () =>
-    (queryCompilerWasmModule?.default ?? queryCompilerWasmModule),
+  getQueryCompilerWasmModule: async () => {
+    const { default: module } = await import("./query_compiler_fast_bg.wasm?module")
+    return module
+  },
 
   importName: "./query_compiler_fast_bg.js"
 }

@@ -6,27 +6,13 @@
 import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
-import { viteStaticCopy } from "vite-plugin-static-copy";
-import { copyFileSync, existsSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
-import { readdirSync, readFileSync } from "fs";
+import { readdirSync } from "fs";
 import { resolve } from "path";
 import { minify_sync } from "terser";
 import ts from "typescript";
 import { defineConfig } from "vite";
-
-const wasmSource = resolve(process.cwd(), "app/generated/prisma/internal/query_compiler_fast_bg.wasm");
-
-const copyWasmPlugin = () => ({
-  name: "copy-prisma-wasm",
-  writeBundle(options) {
-    if (existsSync(wasmSource)) {
-      const outDir = options.dir || resolve(process.cwd(), "build");
-      const destDir = resolve(outDir, "app/generated/prisma/internal");
-      copyFileSync(wasmSource, resolve(destDir, "query_compiler_fast_bg.wasm"));
-    }
-  }
-});
 
 export default defineConfig({
   server: {
@@ -39,17 +25,26 @@ export default defineConfig({
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
     !process.env.VITEST && reactRouter(),
-    viteStaticCopy({
-      targets: [
-        {
-          src: wasmSource,
-          dest: "app/generated/prisma/internal",
-          rename: "query_compiler_fast_bg.wasm"
+    {
+      name: "copy-prisma-wasm",
+      writeBundle(options) {
+        const wasmSource = resolve(process.cwd(), "app/generated/prisma/internal/query_compiler_fast_bg.wasm");
+        if (existsSync(wasmSource)) {
+          const outDir = options.dir || resolve(process.cwd(), "build");
+          const destDir = resolve(outDir, "app/generated/prisma/internal");
+          const destFile = resolve(destDir, "query_compiler_fast_bg.wasm");
+          if (!existsSync(destDir)) {
+            require("fs").mkdirSync(destDir, { recursive: true });
+          }
+          const wasmBuffer = readFileSync(wasmSource);
+          writeFileSync(destFile, wasmBuffer);
+        } else {
+          console.warn("[copy-prisma-wasm] Source wasm not found at:", wasmSource);
+          console.warn("[copy-prisma-wasm] cwd:", process.cwd());
+          console.warn("[copy-prisma-wasm] build outDir:", options.dir);
         }
-      ],
-      hook: "buildStart"
-    }),
-    copyWasmPlugin()
+      }
+    }
   ],
   define: {
     __SPLASH_SCRIPT__: JSON.stringify(
