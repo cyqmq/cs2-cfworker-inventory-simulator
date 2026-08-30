@@ -27,6 +27,16 @@ export default defineConfig({
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
+    {
+      name: "normalize-wasm-module",
+      enforce: "pre",
+      transform(code, id) {
+        if (id.endsWith("class.ts") && code.includes("query_compiler_fast_bg.wasm?module")) {
+          return code.replace("query_compiler_fast_bg.wasm?module", "query_compiler_fast_bg.wasm");
+        }
+        return null;
+      }
+    },
     wasm(),
     !process.env.VITEST && reactRouter(),
     {
