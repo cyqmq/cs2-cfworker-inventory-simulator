@@ -7,6 +7,7 @@ import { CS2Economy, ensure } from "@ianlucas/cs2-lib";
 import { z } from "zod";
 import { api } from "~/api.server";
 import { serverGlobals } from "~/globals";
+import { defaultBuildLanguage } from "~/item-translation.server";
 import { middleware } from "~/middleware.server";
 import {
   API_SCOPE,
@@ -75,7 +76,8 @@ export const action = api(async ({ request }: Route.ActionArgs) => {
     return Response.json({
       ...item.item,
       ...(language !== undefined
-        ? serverGlobals.itemTranslationByLanguage[language][item.id]
+        ? (serverGlobals.itemTranslationByLanguage[language] ??
+          serverGlobals.itemTranslationByLanguage[defaultBuildLanguage])[item.id]
         : item.language)
     });
   } catch {

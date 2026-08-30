@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { serverGlobals } from "~/globals";
 import { middleware } from "~/middleware.server";
+import { defaultBuildLanguage } from "~/item-translation.server";
 import type { Route } from "./+types/translations.$language[.]json._index";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -20,7 +21,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       serverGlobals.systemTranslationByLanguage.english;
     const itemTranslationMap =
       serverGlobals.itemTranslationByLanguage[language] ??
-      serverGlobals.itemTranslationByLanguage.english;
+      serverGlobals.itemTranslationByLanguage[defaultBuildLanguage] ?? {};
     return Response.json(
       { systemTranslationMap, itemTranslationMap },
       {

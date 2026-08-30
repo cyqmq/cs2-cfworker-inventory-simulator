@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { CS2Economy, CS2_ITEMS } from "@ianlucas/cs2-lib";
-import { english } from "@ianlucas/cs2-lib/translations";
+import { schinese } from "@ianlucas/cs2-lib/translations/schinese";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 import type { EntryContext } from "react-router";
@@ -22,7 +22,7 @@ function startOnce() {
   if (initPromise) {
     return initPromise;
   }
-  CS2Economy.load({ items: CS2_ITEMS, language: english });
+  CS2Economy.load({ items: CS2_ITEMS, language: schinese });
   setupTranslation();
   initPromise = (async () => {
     await setupRules();

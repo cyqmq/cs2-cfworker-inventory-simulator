@@ -30,6 +30,64 @@ export default defineConfig({
     wasm(),
     !process.env.VITEST && reactRouter(),
     {
+      name: "inject-build-language",
+      enforce: "pre",
+      transform(code, id) {
+        if (id.includes("app/item-translation.server.ts") && code.includes("IMPORT_BUILD_LANGUAGE")) {
+          const buildLanguage = process.env.BUILD_LANGUAGE ?? "schinese";
+          const languages = [
+            "brazilian",
+            "bulgarian",
+            "czech",
+            "danish",
+            "dutch",
+            "english",
+            "finnish",
+            "french",
+            "german",
+            "greek",
+            "hungarian",
+            "indonesian",
+            "italian",
+            "japanese",
+            "koreana",
+            "latam",
+            "norwegian",
+            "polish",
+            "portuguese",
+            "romanian",
+            "russian",
+            "schinese",
+            "spanish",
+            "swedish",
+            "tchinese",
+            "thai",
+            "turkish",
+            "ukrainian",
+            "vietnamese"
+          ];
+          const lang = languages.includes(buildLanguage)
+            ? buildLanguage
+            : "schinese";
+          const importAlias = `_buildLanguage${lang}`;
+          const injected = [
+            `import { ${lang} as ${importAlias} } from "@ianlucas/cs2-lib/translations/${lang}";`
+          ].join("\n");
+          const replaced = code.replace(
+            "// IMPORT_BUILD_LANGUAGE",
+            `${injected}\nconst itemTranslations: Record<string, unknown> = {\n  [${JSON.stringify(lang)}]: ${importAlias}\n};\nconst buildLanguage = ${JSON.stringify(lang)};`
+          );
+          return replaced
+            .replace(
+              "declare const itemTranslations: Record<string, unknown>;",
+              ""
+            )
+            .replace("declare const buildLanguage: string;", "");
+        }
+        return null;
+      }
+    },
+    {
       name: "copy-prisma-wasm",
       buildStart() {
         if (existsSync(wasmSource)) {
@@ -38,18 +96,6 @@ export default defineConfig({
             mkdirSync(destDir, { recursive: true });
           }
           const destFile = resolve(destDir, "query_compiler_fast_bg.wasm");
-          const wasmBuffer = readFileSync(wasmSource);
-          writeFileSync(destFile, wasmBuffer);
-        }
-      },
-      writeBundle(options) {
-        const outDir = options.dir || resolve(process.cwd(), "build");
-        const destDir = resolve(outDir, "app/generated/prisma/internal");
-        const destFile = resolve(destDir, "query_compiler_fast_bg.wasm");
-        if (!existsSync(destDir)) {
-          mkdirSync(destDir, { recursive: true });
-        }
-        if (existsSync(wasmSource)) {
           const wasmBuffer = readFileSync(wasmSource);
           writeFileSync(destFile, wasmBuffer);
         }

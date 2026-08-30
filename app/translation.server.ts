@@ -3,8 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as itemTranslations from "@ianlucas/cs2-lib/translations";
 import * as languages from "~/translations";
+import { itemTranslationByLanguage } from "./item-translation.server";
 import { serverGlobals } from "./globals";
 
 export type SystemTranslationByLanguage = Record<
@@ -15,5 +15,5 @@ export type SystemTranslationTokens = keyof (typeof languages)["english"];
 
 export function setupTranslation() {
   serverGlobals.systemTranslationByLanguage = languages;
-  serverGlobals.itemTranslationByLanguage = itemTranslations;
+  serverGlobals.itemTranslationByLanguage = itemTranslationByLanguage;
 }
