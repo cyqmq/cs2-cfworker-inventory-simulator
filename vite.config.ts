@@ -6,6 +6,7 @@
 import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
+import wasm from "vite-plugin-wasm";
 import { createHash } from "crypto";
 import { readdirSync, readFileSync } from "fs";
 import { resolve } from "path";
@@ -23,6 +24,7 @@ export default defineConfig({
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
+    wasm(),
     !process.env.VITEST && reactRouter()
   ],
   define: {
