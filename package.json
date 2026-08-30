@@ -78,5 +78,6 @@
     "esbuild@0.28.1": true,
     "prisma@7.10.0": true,
     "workerd@1.20260828.1": true
-  }
+  },
+  "version": "0.0.1"
 }
