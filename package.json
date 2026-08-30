@@ -3,7 +3,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "build": "prisma generate && node scripts/copy-wasm.mjs && react-router build",
+    "build": "prisma generate && react-router build",
     "dev": "react-router dev",
     "format": "prettier . --write",
     "lint": "eslint",
