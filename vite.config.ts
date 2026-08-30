@@ -6,8 +6,7 @@
 import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
-import wasm from "vite-plugin-wasm";
-import { copyFileSync, existsSync } from "fs";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 import { createHash } from "crypto";
 import { readdirSync, readFileSync } from "fs";
 import { resolve } from "path";
@@ -16,7 +15,6 @@ import ts from "typescript";
 import { defineConfig } from "vite";
 
 const wasmSource = resolve(process.cwd(), "app/generated/prisma/internal/query_compiler_fast_bg.wasm");
-const wasmDestDir = resolve(process.cwd(), "build/server/app/generated/prisma/internal");
 
 export default defineConfig({
   server: {
@@ -28,19 +26,17 @@ export default defineConfig({
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
-    wasm(),
     !process.env.VITEST && reactRouter(),
-    {
-      name: "copy-prisma-wasm",
-      writeBundle(options) {
-        const outDir = options.dir || resolve(process.cwd(), "build/server");
-        const destDir = resolve(outDir, "app/generated/prisma/internal");
-        const destFile = resolve(destDir, "query_compiler_fast_bg.wasm");
-        if (existsSync(wasmSource)) {
-          copyFileSync(wasmSource, destFile);
+    viteStaticCopy({
+      targets: [
+        {
+          src: wasmSource,
+          dest: "app/generated/prisma/internal",
+          rename: "query_compiler_fast_bg.wasm"
         }
-      }
-    }
+      ],
+      hook: "buildStart"
+    })
   ],
   define: {
     __SPLASH_SCRIPT__: JSON.stringify(
