@@ -6,13 +6,16 @@
 import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import wasm from "vite-plugin-wasm";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { createHash } from "crypto";
 import { readdirSync } from "fs";
 import { resolve } from "path";
 import { minify_sync } from "terser";
 import ts from "typescript";
 import { defineConfig } from "vite";
+
+const wasmSource = resolve(process.cwd(), "app/generated/prisma/internal/query_compiler_fast_bg.wasm");
 
 export default defineConfig({
   server: {
@@ -24,24 +27,31 @@ export default defineConfig({
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
+    wasm(),
     !process.env.VITEST && reactRouter(),
     {
       name: "copy-prisma-wasm",
-      writeBundle(options) {
-        const wasmSource = resolve(process.cwd(), "app/generated/prisma/internal/query_compiler_fast_bg.wasm");
+      buildStart() {
         if (existsSync(wasmSource)) {
-          const outDir = options.dir || resolve(process.cwd(), "build");
-          const destDir = resolve(outDir, "app/generated/prisma/internal");
-          const destFile = resolve(destDir, "query_compiler_fast_bg.wasm");
+          const destDir = resolve(process.cwd(), "app/generated/prisma/internal");
           if (!existsSync(destDir)) {
-            require("fs").mkdirSync(destDir, { recursive: true });
+            mkdirSync(destDir, { recursive: true });
           }
+          const destFile = resolve(destDir, "query_compiler_fast_bg.wasm");
           const wasmBuffer = readFileSync(wasmSource);
           writeFileSync(destFile, wasmBuffer);
-        } else {
-          console.warn("[copy-prisma-wasm] Source wasm not found at:", wasmSource);
-          console.warn("[copy-prisma-wasm] cwd:", process.cwd());
-          console.warn("[copy-prisma-wasm] build outDir:", options.dir);
+        }
+      },
+      writeBundle(options) {
+        const outDir = options.dir || resolve(process.cwd(), "build");
+        const destDir = resolve(outDir, "app/generated/prisma/internal");
+        const destFile = resolve(destDir, "query_compiler_fast_bg.wasm");
+        if (!existsSync(destDir)) {
+          mkdirSync(destDir, { recursive: true });
+        }
+        if (existsSync(wasmSource)) {
+          const wasmBuffer = readFileSync(wasmSource);
+          writeFileSync(destFile, wasmBuffer);
         }
       }
     }
