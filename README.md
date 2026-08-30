@@ -1,3 +1,4 @@
+# 该项目暂停开发，无法突破cloudflare免费版的硬性要求
 # CS2 Inventory Simulator - Cloudflare Workers 版
 
 基于 [cs2-inventory-simulator](https://github.com/ianlucas/cs2-inventory-simulator) 移植到 Cloudflare Workers (D1 + KV + Assets) 的全栈版本。
