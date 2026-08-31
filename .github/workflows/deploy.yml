@@ -114,11 +114,16 @@ jobs:
       - name: Apply D1 migrations
         run: |
           wrangler d1 migrations apply "${{ steps.resources.outputs.db_name }}" --config wrangler.deploy.jsonc --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy to Cloudflare Workers
         run: |
           wrangler deploy --config wrangler.deploy.jsonc --env ${{ github.event.inputs.environment || 'production' }}
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
           STEAM_CALLBACK_URL: ${{ secrets.STEAM_CALLBACK_URL }}
