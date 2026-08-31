@@ -3,9 +3,12 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureEconomyLoaded } from "./utils/economy-init.server";
+
 export function api<T, U>(action: (args: T) => Promise<U>) {
   return async function handler(args: T): Promise<U> {
     try {
+      ensureEconomyLoaded();
       return await action(args);
     } catch (error) {
       if (error instanceof Response) {

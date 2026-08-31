@@ -3,8 +3,6 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { CS2Economy, CS2_ITEMS } from "@ianlucas/cs2-lib";
-import { schinese } from "@ianlucas/cs2-lib/translations/schinese";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 import type { EntryContext } from "react-router";
@@ -13,6 +11,7 @@ import { warmViewerCaches } from "./data/viewer.server";
 import { setupLogo } from "./logo.server";
 import { setupRules } from "./models/rule";
 import { setupTranslation } from "./translation.server";
+import { ensureEconomyLoaded } from "./utils/economy-init.server";
 
 const ABORT_DELAY = 5_000;
 
@@ -22,7 +21,7 @@ function startOnce() {
   if (initPromise) {
     return initPromise;
   }
-  CS2Economy.load({ items: CS2_ITEMS, language: schinese });
+  ensureEconomyLoaded();
   setupTranslation();
   initPromise = (async () => {
     await setupRules();
