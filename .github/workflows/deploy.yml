@@ -113,7 +113,7 @@ jobs:
 
       - name: Apply D1 migrations
         run: |
-          wrangler d1 migrations apply "${{ steps.resources.outputs.db_name }}" --config wrangler.deploy.jsonc --remote --yes
+          wrangler d1 migrations apply "${{ steps.resources.outputs.db_name }}" --config wrangler.deploy.jsonc --remote
 
       - name: Deploy to Cloudflare Workers
         run: |
