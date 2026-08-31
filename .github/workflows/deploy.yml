@@ -107,6 +107,9 @@ jobs:
               }
             ],
             "vars": { "NODE_ENV": "production" },
+            "secrets": {
+              "required": ["SESSION_SECRET", "STEAM_API_KEY", "STEAM_CALLBACK_URL"]
+            },
             "routes": [
               { "pattern": "clc.ccwu.cc", "custom_domain": true }
             ]
@@ -122,6 +125,33 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Set Cloudflare secrets (before deploy)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          STEAM_CALLBACK_URL: ${{ secrets.STEAM_CALLBACK_URL }}
+        run: |
+          set -euo pipefail
+          SCRIPT="cs2-cfworker-inventory-simulator"
+          put_secret() {
+            [ -n "$2" ] || return 0
+            local payload
+            payload=$(python3 -c 'import json,sys; print(json.dumps({"type":"secret_text","name":sys.argv[1],"text":sys.argv[2]}))' "$1" "$2")
+            curl -sS -X PUT \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${SCRIPT}/secrets" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "$payload" \
+              | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("success") else 1)' \
+                || { echo "failed to set secret $1"; exit 1; }
+            echo "secret $1 set"
+          }
+          put_secret SESSION_SECRET "$SESSION_SECRET"
+          put_secret STEAM_API_KEY "$STEAM_API_KEY"
+          put_secret STEAM_CALLBACK_URL "$STEAM_CALLBACK_URL"
 
       - name: Deploy to Cloudflare Workers
         run: |
