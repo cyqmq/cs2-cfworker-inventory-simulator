@@ -49,6 +49,12 @@ export class Rule<RuleName extends string, RuleValue> {
   public name: RuleName;
   private transform?: (value: unknown) => unknown;
 
+  static cache = new Map<
+    string,
+    { value: unknown; fetchedAt: number }
+  >();
+  static cacheTtlMs = 60_000;
+
   constructor({
     defaultValue,
     name,
@@ -154,7 +160,7 @@ export class Rule<RuleName extends string, RuleValue> {
         break;
       }
     }
-    return await prisma.rule.upsert({
+    const result = await prisma.rule.upsert({
       where: {
         name: this.name
       },
@@ -167,6 +173,8 @@ export class Rule<RuleName extends string, RuleValue> {
         value: strValue
       }
     });
+    Rule.cache.delete(this.name);
+    return result;
   }
 
   private toRuleValue(value: RuleValue): RuleValue {
@@ -175,12 +183,25 @@ export class Rule<RuleName extends string, RuleValue> {
       : value;
   }
 
-  async get() {
+  private async getGlobal(): Promise<RuleValue> {
+    const cached = Rule.cache.get(this.name);
+    if (cached !== undefined) {
+      const expired = Date.now() - cached.fetchedAt > Rule.cacheTtlMs;
+      if (!expired) {
+        return cached.value as RuleValue;
+      }
+    }
     const value = (await prisma.rule.findUnique({ where: { name: this.name } }))
       ?.value;
-    return this.toRuleValue(
+    const resolved = this.toRuleValue(
       value !== undefined ? this.toValue(value) : this.defaultValue
     );
+    Rule.cache.set(this.name, { value: resolved, fetchedAt: Date.now() });
+    return resolved;
+  }
+
+  async get() {
+    return await this.getGlobal();
   }
 
   for(userId: string): RuleFor<RuleValue> {

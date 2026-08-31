@@ -10,8 +10,7 @@ import { res } from "~/responses.server";
 import { safeLoadInventory } from "~/utils/inventory";
 import {
   getUserInventory,
-  getUserInventoryOptions,
-  getUserSyncedAt
+  getUserInventoryOptions
 } from "./user.server";
 
 export async function handleUserCachedResponse({
@@ -32,7 +31,7 @@ export async function handleUserCachedResponse({
   const mimeType =
     typeof throwBody === "string" ? "text/html" : "application/json";
   const user = await prisma.user.findFirst({
-    select: { id: true },
+    select: { id: true, syncedAt: true },
     where: { id: userId }
   });
   if (user === null) {
@@ -40,7 +39,7 @@ export async function handleUserCachedResponse({
       ? res(throwBody, mimeType)
       : Response.json(throwBody);
   }
-  const timestamp = await getUserSyncedAt(userId);
+  const timestamp = user.syncedAt;
   const cache = await prisma.userCache.findFirst({
     select: { body: true },
     where: {
