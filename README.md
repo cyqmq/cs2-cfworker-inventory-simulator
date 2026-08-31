@@ -56,19 +56,25 @@
 
 ### 🔑 必读：为什么 D1/KV 没有被自动创建/绑定？
 
-`deploy.yml` 里已内置「自动创建/复用 D1 + KV 并绑定到 Worker」的流程：
-1. 获取/创建 D1 数据库（`cs2-inventory-production`）
-2. 获取/创建 KV 命名空间（`CACHE-production`）
-3. 用这些 ID 生成带绑定的 `wrangler.deploy.jsonc`
-4. 应用 D1 迁移并部署 Worker
+`deploy.yml` 通过**环境变量 / 部署界面输入**把 D1 与 KV 的 ID 注入绑定配置，绑定到 Worker：
 
-**但它必须依赖两个 Secrets 完成 Cloudflare 认证**：
+1. `workflow_dispatch` 手动触发时，在「Run workflow」界面填入 `d1_database_id` 和 `kv_namespace_id`（可用现有资源的 ID）
+2. 或在仓库 Secrets 配置 `D1_DATABASE_ID` / `KV_NAMESPACE_ID`（推荐，自动生效）
+3. 都不填时，使用默认值（本项目现有资源）生成带绑定的 `wrangler.deploy.jsonc`，应用 D1 迁移并部署 Worker
+
+**ID 优先级**：工作流输入 > Secrets (`D1_DATABASE_ID` / `KV_NAMESPACE_ID`) > 默认值。
+
+请确保以下 Secrets 已配置（用于 Cloudflare 认证 + 可选覆盖资源）：
 - `CLOUDFLARE_API_TOKEN` —— Cloudflare API Token（需有 `Workers Scripts: Edit`、`D1: Edit`、`Workers KV Storage: Edit` 权限）
 - `CLOUDFLARE_ACCOUNT_ID` —— 你的 Cloudflare 账号 ID（Dashboard 右下角可查）
+- `D1_DATABASE_ID` *(可选)* —— 现有 D1 数据库 ID，默认 `b7653ae2-637e-409a-8578-9649e9abcf7b`（`cs2-inventory-db`）
+- `KV_NAMESPACE_ID` *(可选)* —— 现有 KV 命名空间 ID，默认 `ee21da70ae014021881c1249bc6d0451`（`cs2-inventory-kv`）
 
-如果这两个 Secrets **没有配置**（或为空），GitHub Actions 会卡在认证步骤，`whoami` 显示 `You are not authenticated`，**后续创建/绑定 D1、KV 的命令全部未认证而失败**，Worker 即使部署成功也没有 D1/KV 绑定——表现就是「部署成功但没有绑定」。
+如果 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` **没有配置**（或为空），GitHub Actions 会卡在认证步骤，`whoami` 显示 `You are not authenticated`，**部署命令未认证而失败**，Worker 即使部署成功也没有 D1/KV 绑定——表现就是「部署成功但没有绑定」。
 
-**配置后**，重新触发部署（重新 push 到 `main` 或手动 Re-run），即可自动创建/复用并绑定 D1 + KV。
+运行 `npm run deploy:info` 可随时查看当前绑定的 D1/KV 名称与 ID，以及如何获取现有资源 ID。
+
+**配置后**，重新触发部署（重新 push 到 `main` 或手动 Re-run），即可用现有 D1 + KV 绑定并部署。
 
 ### 方式 3：本地 CLI 部署 (开发调试)
 

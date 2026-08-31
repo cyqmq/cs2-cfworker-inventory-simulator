@@ -11,7 +11,23 @@
     "test": "vitest",
     "translate": "tsx scripts/translate.ts && prettier app/translations/*.ts --write",
     "typecheck": "react-router typegen && tsc",
-    "upgrade": "npx npm-check-updates@latest --target minor -u"
+    "upgrade": "npx npm-check-updates@latest --target minor -u",
+    "deploy:info": "node -e \"const c=require('./package.json').cloudflare;console.log('D1 绑定 DB: '+c.d1.database_name);console.log('KV 绑定 CACHE: '+c.kv.title);console.log('');console.log('部署前请在仓库 Secrets 或 workflow_dispatch 输入中配置:');console.log('  D1_DATABASE_ID = '+c.d1.id);console.log('  KV_NAMESPACE_ID = '+c.kv.id);console.log('');console.log('获取现有资源 ID:');console.log('  npx wrangler d1 list --json | jq -r \".[].uuid\"');console.log('  npx wrangler kv namespace list');\""
+  },
+  "cloudflare": {
+    "d1": {
+      "binding": "DB",
+      "database_name": "cs2-inventory-db",
+      "id": "b7653ae2-637e-409a-8578-9649e9abcf7b",
+      "migrations_dir": "./d1-migrations",
+      "description": "D1 SQLite 数据库（用户/库存/Rule/经济数据）。部署时通过 D1_DATABASE_ID 环境变量或部署界面填入现有数据库 ID。"
+    },
+    "kv": {
+      "binding": "CACHE",
+      "title": "cs2-inventory-kv",
+      "id": "ee21da70ae014021881c1249bc6d0451",
+      "description": "KV 缓存（经济价格/投影/速率限制）。部署时通过 KV_NAMESPACE_ID 环境变量或部署界面填入现有命名空间 ID。"
+    }
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.20",

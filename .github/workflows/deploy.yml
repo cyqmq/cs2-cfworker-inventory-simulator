@@ -13,6 +13,16 @@ on:
         options:
         - production
         - preview
+      d1_database_id:
+        description: 'D1 数据库 ID（留空则用默认/Secrets，现有库 cs2-inventory-db 的 ID 为 b7653ae2-637e-409a-8578-9649e9abcf7b）'
+        required: false
+        default: ''
+        type: string
+      kv_namespace_id:
+        description: 'KV 命名空间 ID（留空则用默认/Secrets，现有 cs2-inventory-kv 的 ID 为 ee21da70ae014021881c1249bc6d0451）'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -24,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: ${{ github.event.inputs.environment || 'production' }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -51,58 +61,23 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: whoami
 
-      - name: Create or get D1 database
-        id: d1
+      - name: Resolve D1 / KV resource IDs
+        id: resources
+        env:
+          D1_INPUT: ${{ github.event.inputs.d1_database_id || '' }}
+          KV_INPUT: ${{ github.event.inputs.kv_namespace_id || '' }}
+          D1_SECRET: ${{ secrets.D1_DATABASE_ID }}
+          KV_SECRET: ${{ secrets.KV_NAMESPACE_ID }}
         run: |
           set -euo pipefail
-          DB_NAME="cs2-inventory-${{ github.event.inputs.environment || 'production' }}"
-          
-          # Try to get existing database
-          EXISTING=$(wrangler d1 list --json 2>/dev/null | jq -r ".[] | select(.name==\"$DB_NAME\") | .uuid" || echo "")
-          
-          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
-            DB_ID="$EXISTING"
-            echo "Using existing D1: $DB_ID"
-          else
-            # Create new database
-            CREATE_OUTPUT=$(wrangler d1 create "$DB_NAME" --json 2>&1)
-            DB_ID=$(echo "$CREATE_OUTPUT" | jq -r '.uuid // .id')
-            echo "Created new D1: $DB_ID"
-          fi
-          
-          echo "db_id=$DB_ID" >> $GITHUB_OUTPUT
-          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create or get KV namespace
-        id: kv
-        run: |
-          set -euo pipefail
-          KV_NAME="CACHE-${{ github.event.inputs.environment || 'production' }}"
-          
-          # Get or create production KV
-          EXISTING_KV=$(wrangler kv namespace list --json 2>/dev/null | jq -r ".[] | select(.title==\"$KV_NAME\") | .id" || echo "")
-          
-          if [ -n "$EXISTING_KV" ] && [ "$EXISTING_KV" != "null" ]; then
-            KV_ID="$EXISTING_KV"
-            echo "Using existing KV: $KV_ID"
-          else
-            CREATE_OUTPUT=$(wrangler kv namespace create "$KV_NAME" --json 2>&1)
-            KV_ID=$(echo "$CREATE_OUTPUT" | jq -r '.id')
-            echo "Created new KV: $KV_ID"
-          fi
-          
-          # Get or create preview KV
-          EXISTING_PREVIEW=$(wrangler kv namespace list --preview --json 2>/dev/null | jq -r ".[] | select(.title==\"$KV_NAME\") | .id" || echo "")
-          
-          if [ -n "$EXISTING_PREVIEW" ] && [ "$EXISTING_PREVIEW" != "null" ]; then
-            KV_PREVIEW_ID="$EXISTING_PREVIEW"
-          else
-            CREATE_PREVIEW=$(wrangler kv namespace create "$KV_NAME" --preview --json 2>&1)
-            KV_PREVIEW_ID=$(echo "$CREATE_PREVIEW" | jq -r '.id')
-          fi
-          
-          echo "kv_id=$KV_ID" >> $GITHUB_OUTPUT
-          echo "kv_preview_id=$KV_PREVIEW_ID" >> $GITHUB_OUTPUT
+          # 优先级：工作流输入 > Secrets > 默认（现有资源）
+          D1_ID="${D1_INPUT:-${D1_SECRET:-b7653ae2-637e-409a-8578-9649e9abcf7b}}"
+          KV_ID="${KV_INPUT:-${KV_SECRET:-ee21da70ae014021881c1249bc6d0451}}"
+          DB_NAME="cs2-inventory-db"
+          echo "d1_database_id=$D1_ID" >> "$GITHUB_OUTPUT"
+          echo "kv_namespace_id=$KV_ID" >> "$GITHUB_OUTPUT"
+          echo "db_name=$DB_NAME" >> "$GITHUB_OUTPUT"
+          echo "使用 D1=$DB_NAME ($D1_ID)  kv=CACHE ($KV_ID)"
 
       - name: Generate wrangler config
         run: |
@@ -121,16 +96,15 @@ jobs:
             "d1_databases": [
               {
                 "binding": "DB",
-                "database_name": "${{ steps.d1.outputs.db_name }}",
-                "database_id": "${{ steps.d1.outputs.db_id }}",
+                "database_name": "${{ steps.resources.outputs.db_name }}",
+                "database_id": "${{ steps.resources.outputs.d1_database_id }}",
                 "migrations_dir": "./d1-migrations"
               }
             ],
             "kv_namespaces": [
               {
                 "binding": "CACHE",
-                "id": "${{ steps.kv.outputs.kv_id }}",
-                "preview_id": "${{ steps.kv.outputs.kv_preview_id }}"
+                "id": "${{ steps.resources.outputs.kv_namespace_id }}"
               }
             ],
             "vars": { "NODE_ENV": "production" }
@@ -139,7 +113,7 @@ jobs:
 
       - name: Apply D1 migrations
         run: |
-          wrangler d1 migrations apply "${{ steps.d1.outputs.db_name }}" --config wrangler.deploy.jsonc --remote --yes
+          wrangler d1 migrations apply "${{ steps.resources.outputs.db_name }}" --config wrangler.deploy.jsonc --remote --yes
 
       - name: Deploy to Cloudflare Workers
         run: |
