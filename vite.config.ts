@@ -38,6 +38,24 @@ export default defineConfig({
       }
     },
     wasm(),
+    {
+      name: "patch-steamapi",
+      enforce: "pre",
+      transform(code, id) {
+        if (id.includes("steamapi/dist/src/SteamAPI.js")) {
+          return code
+            .replace(
+              "const require = createRequire(import.meta.url);",
+              "const require = (_p) => ({});"
+            )
+            .replace(
+              "const Package = require('../../package.json');",
+              "const Package = { version: '3.1.5' };"
+            );
+        }
+        return null;
+      }
+    },
     !process.env.VITEST && reactRouter(),
     {
       name: "inject-build-language",
