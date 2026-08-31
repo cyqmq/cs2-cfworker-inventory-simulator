@@ -1,14 +1,50 @@
 # CS2 Inventory Simulator - Cloudflare Workers 版
 
+> ## 🗄️ 仓库已归档（ARCHIVED）
+>
+> **本仓库已停止开发并归档。** 原因是该项目无法在 Cloudflare **免费版**资源配额下稳定运行，投入代码优化的性价比已不足以支撑继续维护。以下记录归档的真实原因与现状难点。
+
 > ✅ 已突破 Cloudflare 免费版 3MB 限制：Worker 产物 gzip 压缩后 **≈2.99 MB**（低于 3,072 KB 免费上限），已可在免费套餐上正常构建与部署。
 
 基于 [cs2-inventory-simulator](https://github.com/ianlucas/cs2-inventory-simulator) 移植到 Cloudflare Workers (D1 + Assets) 的全栈版本。
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?repository-url=https://github.com/cyqmq/cs2-cfworker-inventory-simulator)
+## 🚧 归档原因（为什么停止开发）
 
-**点击上方按钮 → 授权 GitHub → 自动创建 D1 → 部署完成** (约 2-3 分钟)
+这是把原版 **重 SSR** 应用移植到 **Cloudflare Workers 免费版** 的一次实践。最终卡在免费版**运行时配额**上——不是代码/数据问题，而是免费版资源不足以稳定承载这个应用。
 
-> ⚠️ 使用下方「方式 2 / 方式 3」时，务必先在仓库配置 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个 Secrets，否则 GitHub Actions 无法通过 Cloudflare 认证，**自动创建/绑定 D1 的流程不会执行**（详见「🔑 必读：D1 绑定与 Secrets」）。
+### 根本原因：免费版 CPU 硬限制 vs 巨大冷启动成本
+
+- Cloudflare Workers 免费版（$0）**每个请求 CPU 上限仅 10ms**，超出即报 `Error 1102 Worker exceeded resource limits`（整页 500 / 请求被丢弃）。
+- 这个应用是**服务端渲染（SSR）**：每个请求冷启动时要解析并执行的 JS 原文约 **19 MB**：
+  - `server-build` 主 bundle：**≈9.8 MB**（应用逻辑 + 全部路由 + Prisma Client）
+  - `translation.server`：**≈7.8 MB**（schinese 物品名翻译表，SSR 首屏渲染物品名必需）
+  - Prisma 查询编译器 wasm：**≈1.7 MB**
+- 冷启动还要一次性加载约 **1.6 MB** 的 CS2 经济数据（`CS2Economy.load`）并反序列化完整玩家库存。
+- 实测：冷启动响应 **3.6~4.4 秒**（热请求 0.8s，但实例回收频繁导致冷/热随机交替）。这些 CPU 累积在免费版 10ms 配额下**几乎必超限**。
+
+### 用户可见的表现（同一根因）
+
+| 现象 | 原因 |
+|---|---|
+| 页面整页报错 `Error 1102` | 请求 CPU 超限被丢弃 |
+| 间歇性 "Application Error" | 服务端渲染超限/异常 |
+| **登录后添加皮肤，刷新就丢失** | `api/action/sync` 请求超限失败 → 操作**没写进 D1**。玩家浏览器本地能看到（localStorage 缓存），但服务器从未保存 |
+
+**关键结论：数据没有丢。** 诊断确认玩家的 `User.inventory` 数据源完整（26 件皮肤）、生产 `api/inventory/*.json` 返回完整数据、D1 无任何清空记录。看起来"丢档"是因为**写入请求超限失败，而非数据被删除**。
+
+### 现状难点（为什么难以免费修复）
+
+1. **冷启动本身 CPU 超限。** SSR 首屏必须同步持有 7.8MB 物品翻译 + 9.8MB 主 bundle + 1.7MB Prisma wasm。即使把翻译懒加载或分 chunk，剩余的 **~11MB（server-build + wasm）** 在免费版 10ms CPU 下依然很可能超限。
+2. **实例回收不可控。** Cloudflare 不保证 worker 常驻，免费版实例频繁回收，无法靠"预热/保温"解决。
+3. **收费优化空间有限、且有功能/风险成本。** 大幅重构（服务端只做轻 API、物品名翻译全量移客户端等）是数天工作量，且只"缓解"而不"根治" 10ms 硬配额。
+4. **这是结构性不匹配。** 原作者用付费计划/自托管运行，就是因为该应用重量级；免费版更适合轻量 API 或静态站点。
+
+### 可行的出路（未执行，记录以备参考）
+
+- **升级 Workers Paid（$5/月）**：CPU 配额从 10ms 提升到 **30s**，可彻底消除 1102。这是唯一能根治的路径，几乎零代码改动。
+- 坚持免费版则需做上述大重构，仍难保证稳定，性价比低——这正是选择归档的原因。
+
+---
 
 ## ✨ 特性
 
@@ -344,7 +380,7 @@ Dashboard > Workers > cs2-cfworker-inventory-simulator > Triggers > Custom Domai
 | D1 存储 | 5 GB | $0.75/GB/月 |
 | Assets | 无限 | 免费 |
 
-**典型个人用量远在免费额度内**。
+> ⚠️ **注：免费版 CPU 配额（10ms/请求）是本仓库归档的根本瓶颈。** 请求量虽在免费额度内，但**单个请求**的 CPU 远超 10ms（冷启动需解析约 19MB JS），导致间歇性 1102 超限。详见顶部「🚧 归档原因」章节。成本表格仅供参考，不代表该应用能在免费版 CPU 配额下稳定运行。
 
 ## 🤝 贡献指南
 
