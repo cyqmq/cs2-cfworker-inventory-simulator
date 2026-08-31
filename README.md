@@ -316,7 +316,24 @@ Dashboard > Workers > cs2-cfworker-inventory-simulator > Triggers > Custom Domai
 
 > Steam 登录重定向验证：`curl -sI https://clc.ccwu.cc/sign-in | grep -i location` 应看到 `openid.return_to=https%3A%2F%2Fclc.ccwu.cc%2Fsign-in%2Fsteam%2Fcallback`。
 
-## 📊 监控与调试
+### ⚠️ 部署避坑（CI 实测结论）
+
+以下为在真实 CI 中踩过的坑，按 `deploy.yml` / `ci.yml` 修复要点整理：
+
+1. **CI 里不要用裸 `wrangler`**。wrangler 不是本仓库的 `devDependencies`，而是 `@cloudflare/vite-plugin` 的传递依赖；除非全局安装，否则裸 `wrangler`（migrate / secret bulk / deploy）可能 `exit 127` 找不到命令。CI 中统一用 **`npx wrangler`**。
+
+2. **`wrangler secret bulk` 期望 JSON 对象** `{"KEY": "value"}`，**不是**数组 `[{"name","text"}]`。写成数组会报 `The value for "0" ... is of type "object"`。用 Python `json.dump({k:v ...})` 生成对象。
+
+3. **Secrets 必须在 `wrangler deploy` 之前写入**，且不要事后单独 `wrangler secret put`（会生成仅含 secret、丢失 D1/KV/Assets 绑定的新版本导致 404）。
+
+4. **`skipDuplicates: true` 在 D1 不可用**（该连接器类型标为 `never`）。需要幂等插入时改用 `upsert`（含主键）或先经 `lastSucceededSourceDate` 等短路。
+
+5. **equipped / inventory API 依赖 `CS2Economy` 加载**。`CS2Economy.load` 原仅在页面渲染路径执行，API 冷 isolate 未初始化会导致 equipped 接口稳定返回空。已通过 `app/utils/economy-init.server.ts` 的幂等 `ensureEconomyLoaded()` 在 `entry.server.tsx` 与 `api.server.ts` 处理器中统一调用。
+
+6. **CI 的 `npm ci` 需 `--legacy-peer-deps`**：`@react-router/cloudflare` 与 `@cloudflare/workers-types` 有 peer 冲突，不加会 `ERESOLVE` 失败。
+
+7. **vitest 下要跳过 Cloudflare vite 插件**：`cloudflare()` 在 `VITEST` 环境会因 `resolve.external` 报错；用 `!process.env.VITEST && cloudflare(...)` 条件化（与 `reactRouter()` 处理一致）。
+
 
 - **实时日志**: `wrangler tail`
 - **指标面板**: Dashboard > Workers > Metrics (请求数、CPU、错误率)
