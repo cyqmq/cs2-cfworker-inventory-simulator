@@ -133,24 +133,6 @@ jobs:
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
           STEAM_CALLBACK_URL: ${{ secrets.STEAM_CALLBACK_URL }}
 
-      - name: Set Cloudflare secrets
-        run: |
-          if [ -n "$SESSION_SECRET" ]; then
-            echo "$SESSION_SECRET" | wrangler secret put SESSION_SECRET
-          fi
-          if [ -n "$STEAM_API_KEY" ]; then
-            echo "$STEAM_API_KEY" | wrangler secret put STEAM_API_KEY
-          fi
-          if [ -n "$STEAM_CALLBACK_URL" ]; then
-            echo "$STEAM_CALLBACK_URL" | wrangler secret put STEAM_CALLBACK_URL
-          fi
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
-          STEAM_CALLBACK_URL: ${{ secrets.STEAM_CALLBACK_URL }}
-
       - name: Comment deployment URL
         if: github.event_name == 'push'
         run: |
