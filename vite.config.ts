@@ -10,12 +10,18 @@ import wasm from "vite-plugin-wasm";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { createHash } from "crypto";
 import { readdirSync } from "fs";
-import { resolve } from "path";
+import { basename, resolve } from "path";
 import { minify_sync } from "terser";
 import ts from "typescript";
 import { defineConfig } from "vite";
 
-const wasmSource = resolve(process.cwd(), "app/generated/prisma/internal/query_compiler_fast_bg.wasm");
+const prismaInternalDir = resolve(process.cwd(), "app/generated/prisma/internal");
+function resolvePrismaCompilerWasm() {
+  const fast = resolve(prismaInternalDir, "query_compiler_fast_bg.wasm");
+  const small = resolve(prismaInternalDir, "query_compiler_small_bg.wasm");
+  return existsSync(fast) ? fast : small;
+}
+const wasmSource = resolvePrismaCompilerWasm();
 
 export default defineConfig({
   server: {
@@ -32,10 +38,13 @@ export default defineConfig({
       name: "normalize-wasm-module",
       enforce: "pre",
       transform(code, id) {
-        if (id.endsWith("class.ts") && code.includes("query_compiler_fast_bg.wasm?module")) {
-          return code.replace("query_compiler_fast_bg.wasm?module", "query_compiler_fast_bg.wasm");
-        }
-        return null;
+        if (!id.endsWith("class.ts")) return null;
+        if (!/query_compiler_(fast|small)_bg\.wasm\?module/.test(code)) return null;
+        const target = basename(wasmSource);
+        return code.replace(
+          /query_compiler_(fast|small)_bg\.wasm\?module/g,
+          target
+        );
       }
     },
     wasm(),
@@ -120,11 +129,11 @@ export default defineConfig({
       name: "copy-prisma-wasm",
       buildStart() {
         if (existsSync(wasmSource)) {
-          const destDir = resolve(process.cwd(), "app/generated/prisma/internal");
+          const destDir = prismaInternalDir;
           if (!existsSync(destDir)) {
             mkdirSync(destDir, { recursive: true });
           }
-          const destFile = resolve(destDir, "query_compiler_fast_bg.wasm");
+          const destFile = resolve(destDir, basename(wasmSource));
           const wasmBuffer = readFileSync(wasmSource);
           writeFileSync(destFile, wasmBuffer);
         }
