@@ -329,3 +329,4 @@ MIT License - 详见 [LICENSE](LICENSE)
 ---
 
 **部署遇到问题？** 提交 [Issue](https://github.com/cyqmq/cs2-cfworker-inventory-simulator/issues) 或查看 [Discussions](https://github.com/cyqmq/cs2-cfworker-inventory-simulator/discussions)。
+
