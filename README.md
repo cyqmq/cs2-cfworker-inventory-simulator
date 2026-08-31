@@ -144,7 +144,7 @@ curl -s "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/depl
 | Secret | 说明 | 示例 |
 |--------|------|------|
 | `SESSION_SECRET` | 会话签名密钥，≥32 字符随机串 | `openssl rand -base64 32` |
-| `STEAM_API_KEY` | Steam Web API Key（最终生效值也存 D1 `Rule.steamApiKey`） | `__STEAM_API_KEY_PLACEHOLDER__` |
+| `STEAM_API_KEY` | Steam Web API Key（最终生效值也存 D1 `Rule.steamApiKey`） | `你的 Steam Web API Key` |
 | `STEAM_CALLBACK_URL` | Steam 回调完整 URL (必须 HTTPS)（最终生效值也存 D1 `Rule.steamCallbackUrl`） | `https://your-domain.com/sign-in/steam/callback` |
 
 > 注意：`STEAM_API_KEY` / `STEAM_CALLBACK_URL` 的**实际生效值由 D1 `Rule` 表决定**（存在时优先于 Secret）。需要改时同步更新 D1。
