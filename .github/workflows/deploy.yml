@@ -48,9 +48,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Build project
-        run: npm run build
-
       - name: Install Wrangler
         run: npm install -g wrangler@latest
 
@@ -81,7 +78,7 @@ jobs:
 
       - name: Generate wrangler config
         run: |
-          cat > wrangler.deploy.jsonc <<EOF
+          cat > wrangler.jsonc <<EOF
           {
             "\$schema": "node_modules/wrangler/config-schema.json",
             "name": "cs2-cfworker-inventory-simulator",
@@ -111,16 +108,19 @@ jobs:
           }
           EOF
 
+      - name: Build project
+        run: npm run build
+
       - name: Apply D1 migrations
         run: |
-          wrangler d1 migrations apply "${{ steps.resources.outputs.db_name }}" --config wrangler.deploy.jsonc --remote
+          wrangler d1 migrations apply "${{ steps.resources.outputs.db_name }}" --remote
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy to Cloudflare Workers
         run: |
-          wrangler deploy --config wrangler.deploy.jsonc --env ${{ github.event.inputs.environment || 'production' }}
+          wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
