@@ -39,6 +39,9 @@ coverage/
 # Prisma
 prisma/migrations/.migration_lock.toml
 
+# Prisma generated client (rebuilt by `prisma generate` in npm run build)
+app/generated/
+
 # Temporary files
 *.tmp
 *.temp

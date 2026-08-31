@@ -8,9 +8,9 @@ set -euo pipefail
 ENV="${1:-preview}"
 DOMAIN="clc.ccwu.cc"
 SCRIPT="cs2-cfworker-inventory-simulator"
-D1_NAME="cs2-inventory-db"
-D1_ID="b7653ae2-637e-409a-8578-9649e9abcf7b"
-KV_ID="ee21da70ae014021881c1249bc6d0451"
+D1_NAME=$(node -p "require('./package.json').cloudflare.d1.database_name")
+D1_ID=$(node -p "require('./package.json').cloudflare.d1.id")
+KV_ID=$(node -p "require('./package.json').cloudflare.kv.id")
 
 echo "🚀 部署 $ENV 环境 → $SCRIPT"
 

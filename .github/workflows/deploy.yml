@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       d1_database_id:
-        description: 'D1 数据库 ID（留空则用默认/Secrets，现有库 cs2-inventory-db 的 ID 为 b7653ae2-637e-409a-8578-9649e9abcf7b）'
+        description: 'D1 数据库 ID（留空则用 Secrets / package.json 默认值）'
         required: false
         default: ''
         type: string
       kv_namespace_id:
-        description: 'KV 命名空间 ID（留空则用默认/Secrets，现有 cs2-inventory-kv 的 ID 为 ee21da70ae014021881c1249bc6d0451）'
+        description: 'KV 命名空间 ID（留空则用 Secrets / package.json 默认值）'
         required: false
         default: ''
         type: string
@@ -58,9 +58,12 @@ jobs:
           KV_SECRET: ${{ secrets.KV_NAMESPACE_ID }}
         run: |
           set -euo pipefail
-          # 优先级：工作流输入 > Secrets > 默认（现有资源）
-          D1_ID="${D1_INPUT:-${D1_SECRET:-b7653ae2-637e-409a-8578-9649e9abcf7b}}"
-          KV_ID="${KV_INPUT:-${KV_SECRET:-ee21da70ae014021881c1249bc6d0451}}"
+          # 默认值以 package.json 的 cloudflare 配置为权威源，避免多处分叉
+          DEFAULT_D1=$(node -p "require('./package.json').cloudflare.d1.id")
+          DEFAULT_KV=$(node -p "require('./package.json').cloudflare.kv.id")
+          # 优先级：工作流输入 > Secrets > package.json 默认
+          D1_ID="${D1_INPUT:-${D1_SECRET:-$DEFAULT_D1}}"
+          KV_ID="${KV_INPUT:-${KV_SECRET:-$DEFAULT_KV}}"
           DB_NAME="cs2-inventory-db"
           echo "d1_database_id=$D1_ID" >> "$GITHUB_OUTPUT"
           echo "kv_namespace_id=$KV_ID" >> "$GITHUB_OUTPUT"

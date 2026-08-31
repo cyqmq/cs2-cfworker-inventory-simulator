@@ -5,13 +5,21 @@
 
 import { RouterContextProvider } from "react-router";
 import { createRequestHandler } from "@react-router/cloudflare";
+import type { ExportedHandler, KVNamespace, D1Database, Fetcher } from "@cloudflare/workers-types";
 import { setupTranslation } from "~/translation.server";
 
 declare global {
   var ENV: Record<string, any> | undefined;
 }
 
-const handleRequest = createRequestHandler({
+export interface Env {
+  ASSETS: Fetcher;
+  DB: D1Database;
+  CACHE: KVNamespace;
+  NODE_ENV: string;
+}
+
+const handleRequest = createRequestHandler<Env>({
   build: () => import("virtual:react-router/server-build"),
   mode: import.meta.env.MODE,
   getLoadContext() {
