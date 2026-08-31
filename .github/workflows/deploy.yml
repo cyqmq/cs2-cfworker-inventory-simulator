@@ -10,11 +10,6 @@ on:
         required: false
         default: ''
         type: string
-      kv_namespace_id:
-        description: 'KV 命名空间 ID（留空则用 Secrets / package.json 默认值）'
-        required: false
-        default: ''
-        type: string
 
 concurrency:
   group: deploy-production
@@ -49,26 +44,21 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: whoami
 
-      - name: Resolve D1 / KV resource IDs
+      - name: Resolve D1 resource ID
         id: resources
         env:
           D1_INPUT: ${{ github.event.inputs.d1_database_id || '' }}
-          KV_INPUT: ${{ github.event.inputs.kv_namespace_id || '' }}
           D1_SECRET: ${{ secrets.D1_DATABASE_ID }}
-          KV_SECRET: ${{ secrets.KV_NAMESPACE_ID }}
         run: |
           set -euo pipefail
           # 默认值以 package.json 的 cloudflare 配置为权威源，避免多处分叉
           DEFAULT_D1=$(node -p "require('./package.json').cloudflare.d1.id")
-          DEFAULT_KV=$(node -p "require('./package.json').cloudflare.kv.id")
           # 优先级：工作流输入 > Secrets > package.json 默认
           D1_ID="${D1_INPUT:-${D1_SECRET:-$DEFAULT_D1}}"
-          KV_ID="${KV_INPUT:-${KV_SECRET:-$DEFAULT_KV}}"
           DB_NAME="cs2-inventory-db"
           echo "d1_database_id=$D1_ID" >> "$GITHUB_OUTPUT"
-          echo "kv_namespace_id=$KV_ID" >> "$GITHUB_OUTPUT"
           echo "db_name=$DB_NAME" >> "$GITHUB_OUTPUT"
-          echo "使用 D1=$DB_NAME ($D1_ID)  kv=CACHE ($KV_ID)"
+          echo "使用 D1=$DB_NAME ($D1_ID)"
 
       - name: Generate wrangler config
         run: |
@@ -90,12 +80,6 @@ jobs:
                 "database_name": "${{ steps.resources.outputs.db_name }}",
                 "database_id": "${{ steps.resources.outputs.d1_database_id }}",
                 "migrations_dir": "./d1-migrations"
-              }
-            ],
-            "kv_namespaces": [
-              {
-                "binding": "CACHE",
-                "id": "${{ steps.resources.outputs.kv_namespace_id }}"
               }
             ],
             "vars": { "NODE_ENV": "production" },
@@ -181,7 +165,7 @@ jobs:
               b = version(vid)
               types = {x.get("type") for x in b}
               names = {x.get("name") for x in b}
-              if "d1" in types and "kv_namespace" in types and "assets" in types and "SESSION_SECRET" in names:
+              if "d1" in types and "assets" in types and "SESSION_SECRET" in names:
                   candidate = vid
                   if dep is latest_deploy:
                       print(f"最新 deployment 已含完整绑定: {vid[:8]} (deployment {dep['id'][:8]})")

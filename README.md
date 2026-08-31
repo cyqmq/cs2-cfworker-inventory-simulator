@@ -2,13 +2,13 @@
 
 > ✅ 已突破 Cloudflare 免费版 3MB 限制：Worker 产物 gzip 压缩后 **≈2.99 MB**（低于 3,072 KB 免费上限），已可在免费套餐上正常构建与部署。
 
-基于 [cs2-inventory-simulator](https://github.com/ianlucas/cs2-inventory-simulator) 移植到 Cloudflare Workers (D1 + KV + Assets) 的全栈版本。
+基于 [cs2-inventory-simulator](https://github.com/ianlucas/cs2-inventory-simulator) 移植到 Cloudflare Workers (D1 + Assets) 的全栈版本。
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?repository-url=https://github.com/cyqmq/cs2-cfworker-inventory-simulator)
 
-**点击上方按钮 → 授权 GitHub → 自动创建 D1/KV → 部署完成** (约 2-3 分钟)
+**点击上方按钮 → 授权 GitHub → 自动创建 D1 → 部署完成** (约 2-3 分钟)
 
-> ⚠️ 使用下方「方式 2 / 方式 3」时，务必先在仓库配置 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个 Secrets，否则 GitHub Actions 无法通过 Cloudflare 认证，**自动创建/绑定 D1 与 KV 的流程不会执行**（详见「🔑 必读：自动创建 D1/KV 的前提」）。
+> ⚠️ 使用下方「方式 2 / 方式 3」时，务必先在仓库配置 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个 Secrets，否则 GitHub Actions 无法通过 Cloudflare 认证，**自动创建/绑定 D1 的流程不会执行**（详见「🔑 必读：D1 绑定与 Secrets」）。
 
 ## ✨ 特性
 
@@ -16,9 +16,9 @@
 - 🔐 **Steam OpenID 登录** - 无密码，安全可靠
 - ⚡ **边缘计算** - Cloudflare Workers 全球边缘节点，毫秒级响应
 - 💾 **D1 数据库** - SQLite 兼容，自动扩展，按需付费
-- 🗂️ **KV 缓存** - 经济数据、投影数据边缘缓存
+- ⚡ **多级缓存** - D1 持久化缓存（`UserCache`）+ 进程内单例缓存，equipped/inventory API 快速响应
 - 📦 **静态资源** - 内置 Assets 绑定，零配置 CDN
-- 🔒 **生产就绪** - HTTPS 自动强制、Secure Cookie、CSP、速率限制
+- 🔒 **生产就绪** - HTTPS 自动强制、Secure Cookie、安全响应头、速率限制
 
 ## 🚀 一键部署
 
@@ -30,11 +30,11 @@
 1. Fork 本仓库到你的 GitHub 账号
 2. 点击上方按钮 → 授权 GitHub → 触发 **GitHub Actions 部署**（Deploy Button 与"方式 2"走同一条 `deploy.yml` 流水线）
 3. 部署流水线自动：
-   - ✅ 解析并绑定 D1 数据库（默认 `cs2-inventory-db`）与 KV 命名空间（默认 `cs2-inventory-kv`）
+   - ✅ 解析并绑定 D1 数据库（默认 `cs2-inventory-db`）
    - ✅ 运行数据库迁移（`wrangler d1 migrations apply --remote`）
    - ✅ 在 `wrangler deploy` **之前**通过 API 设置 Secrets
    - ✅ 构建并部署 Worker，并将 `clc.ccwu.cc` 绑定为 custom domain
-   - ✅ 部署后校验 active deployment 含完整绑定（D1+KV+ASSETS+Secrets）
+   - ✅ 部署后校验 active deployment 含完整绑定（D1+ASSETS+Secrets）
 4. 部署前需在 Fork 仓库 **Settings > Secrets and variables > Actions** 添加：
    - `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`
    - `SESSION_SECRET` (随机 32+ 字符，`openssl rand -base64 32`)
@@ -58,29 +58,28 @@
 3. 推送到 `main` 分支 → Actions 自动部署
 4. 部署后访问 `https://clc.ccwu.cc`（如需换域名，修改 `deploy.yml` 的 custom domain 并更新 `STEAM_CALLBACK_URL` / D1 `steamCallbackUrl` Rule）
 
-### 🔑 必读：D1/KV 绑定与 Secrets
+### 🔑 必读：D1 绑定与 Secrets
 
-`deploy.yml` 通过 **环境变量 / Secrets / workflow_dispatch 输入** 把 D1 与 KV 的 ID 注入 `wrangler.jsonc` 绑定配置，然后执行 `wrangler deploy`。
+`deploy.yml` 通过 **环境变量 / Secrets / workflow_dispatch 输入** 把 D1 的 ID 注入 `wrangler.jsonc` 绑定配置，然后执行 `wrangler deploy`。
 
-1. `workflow_dispatch` 手动触发时，在「Run workflow」界面填入 `d1_database_id` 和 `kv_namespace_id`（可用现有资源的 ID）
-2. 或在仓库 Secrets 配置 `D1_DATABASE_ID` / `KV_NAMESPACE_ID`（推荐，自动生效）
-3. 都不填时，使用 `package.json` 中 `cloudflare` 配置的默认 ID（`d1.id` / `kv.id`，即当前 `cs2-inventory-db` / `cs2-inventory-kv`）生成带完整绑定的 `wrangler.jsonc`，应用 D1 迁移并部署 Worker
+1. `workflow_dispatch` 手动触发时，在「Run workflow」界面填入 `d1_database_id`（可用现有资源的 ID）
+2. 或在仓库 Secrets 配置 `D1_DATABASE_ID`（推荐，自动生效）
+3. 都不填时，使用 `package.json` 中 `cloudflare` 配置的默认 ID（`d1.id`，即当前 `cs2-inventory-db`）生成带完整绑定的 `wrangler.jsonc`，应用 D1 迁移并部署 Worker
 
-**ID 优先级**：工作流输入 > Secrets (`D1_DATABASE_ID` / `KV_NAMESPACE_ID`) > `package.json` 默认值。
+**ID 优先级**：工作流输入 > Secrets (`D1_DATABASE_ID`) > `package.json` 默认值。
 
 请确保以下 Secrets 已配置（用于 Cloudflare 认证 + 可选覆盖资源）：
-- `CLOUDFLARE_API_TOKEN` —— Cloudflare API Token（需有 `Workers Scripts: Edit`、`D1: Edit`、`Workers KV Storage: Edit` 权限）
+- `CLOUDFLARE_API_TOKEN` —— Cloudflare API Token（需有 `Workers Scripts: Edit`、`D1: Edit` 权限）
 - `CLOUDFLARE_ACCOUNT_ID` —— 你的 Cloudflare 账号 ID（Dashboard 右下角可查）
 - `D1_DATABASE_ID` *(可选)* —— 现有 D1 数据库 ID，默认取 `package.json` `cloudflare.d1.id`（当前 `cs2-inventory-db`）
-- `KV_NAMESPACE_ID` *(可选)* —— 现有 KV 命名空间 ID，默认取 `package.json` `cloudflare.kv.id`（当前 `cs2-inventory-kv`）
 
-如果 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` **没有配置**（或为空），GitHub Actions 会卡在认证步骤，`whoami` 显示 `You are not authenticated`，**部署命令未认证而失败**，Worker 即使部署成功也没有 D1/KV 绑定——表现就是「部署成功但没有绑定」。
+如果 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` **没有配置**（或为空），GitHub Actions 会卡在认证步骤，`whoami` 显示 `You are not authenticated`，**部署命令未认证而失败**，Worker 即使部署成功也没有 D1 绑定——表现就是「部署成功但没有绑定」。
 
-运行 `npm run deploy:info` 可随时查看当前绑定的 D1/KV 名称与 ID，以及如何获取现有资源 ID。
+运行 `npm run deploy:info` 可随时查看当前绑定的 D1 名称与 ID，以及如何获取现有资源 ID。
 
-**配置后**，重新触发部署（重新 push 到 `main` 或手动 Re-run），即可用现有 D1 + KV 绑定并部署。
+**配置后**，重新触发部署（重新 push 到 `main` 或手动 Re-run），即可用现有 D1 绑定并部署。
 
-> ⚠️ **不要在 `wrangler deploy` 之后单独执行 `wrangler secret put`！** 这会创建一个仅含 secret、丢失全部绑定（D1/KV/Assets）的新版本并成为 active，导致 404。Secrets 应在 `wrangler deploy` **之前**通过 API 或 deploy.yml 流水线写入。
+> ⚠️ **不要在 `wrangler deploy` 之后单独执行 `wrangler secret put`！** 这会创建一个仅含 secret、丢失全部绑定（D1/Assets）的新版本并成为 active，导致 404。Secrets 应在 `wrangler deploy` **之前**通过 API 或 deploy.yml 流水线写入。
 
 ### 方式 3：本地 CLI 部署 (开发调试)
 
@@ -108,18 +107,13 @@ export STEAM_CALLBACK_URL="https://clc.ccwu.cc/sign-in/steam/callback"
 wrangler d1 create cs2-inventory-db
 # 记下输出的 database_id
 
-# 2. 创建 KV 命名空间
-wrangler kv namespace create cs2-inventory-kv
-wrangler kv namespace create cs2-inventory-kv --preview
-# 记下两个 id
+# 2. 复制并编辑 wrangler.jsonc（填入 database_id）
+#    注意：wrangler.jsonc 已在 .gitignore 中，不会提交到仓库
 
-# 3. 复制并编辑 wrangler.jsonc（填入 database_id, kv_id, preview_id）
-# 注意：wrangler.jsonc 已在 .gitignore 中，不会提交到仓库
-
-# 4. 应用迁移
+# 3. 应用迁移
 wrangler d1 migrations apply cs2-inventory-db --remote --yes
 
-# 5. 设置 Secrets（⚠️ 必须在 wrangler deploy 之前完成！）
+# 4. 设置 Secrets（⚠️ 必须在 wrangler deploy 之前完成！）
 #    单独的 wrangler secret put 会创建仅含 secret 的空绑定版本导致 404
 #    推荐使用 deploy.yml 流水线（自动处理顺序），或通过 API 批量写入
 wrangler secret put SESSION_SECRET
@@ -181,7 +175,7 @@ curl -s "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/depl
 
 ### Rule 配置 (运行时逻辑)
 
-最常改的两个运行配置也持久化在 D1 `Rule` 表（非 KV）：
+最常改的两个运行配置也持久化在 D1 `Rule` 表：
 
 - `steamApiKey` —— Steam Web API Key
 - `steamCallbackUrl` —— Steam 回调地址（如 `https://clc.ccwu.cc/sign-in/steam/callback`）
@@ -208,8 +202,7 @@ INSERT INTO Rule (name, type, value) VALUES ('inventoryItemMaxStickers', 'string
 ├─────────────────────────────────────────────────────────────┤
 │  Workers (React Router v8 SSR)                               │
 │  ├── Assets Binding → 静态资源 (JS/CSS/图片/字体)             │
-│  ├── D1 Binding → SQLite 数据库 (用户/库存/Rule/经济数据)      │
-│  └── KV Binding → 缓存 (经济价格/投影/速率限制)                │
+│  └── D1 Binding → SQLite 数据库 (用户/库存/Rule/经济/缓存)     │
 └─────────────────────────────────────────────────────────────┘
                               │
                     ┌─────────┴─────────┐
@@ -225,14 +218,14 @@ INSERT INTO Rule (name, type, value) VALUES ('inventoryItemMaxStickers', 'string
 | 框架 | React Router v8 | SSR + SPA 混合，Single Fetch 模式 |
 | 运行时 | Cloudflare Workers | V8 Isolates，无冷启动容器 |
 | 数据库 | D1 (SQLite) | Prisma ORM + `@prisma/adapter-d1` |
-| 缓存 | Workers KV | 经济数据、投影、速率限制桶 |
+| 缓存 | D1 + 内存 | `UserCache` 表 + 进程内单例 (经济/投影/economy) |
 | 认证 | Steam OpenID 2.0 | Cookie 会话 + HttpOnly Secure |
 | 部署 | Wrangler | 零配置 CI/CD |
 
 ## 🔧 本地开发
 
 ```bash
-# 启动本地开发环境 (模拟 D1/KV)
+# 启动本地开发环境 (模拟 D1)
 npm run dev
 
 # 访问 http://localhost:8788
@@ -324,7 +317,7 @@ Dashboard > Workers > cs2-cfworker-inventory-simulator > Triggers > Custom Domai
 
 2. **`wrangler secret bulk` 期望 JSON 对象** `{"KEY": "value"}`，**不是**数组 `[{"name","text"}]`。写成数组会报 `The value for "0" ... is of type "object"`。用 Python `json.dump({k:v ...})` 生成对象。
 
-3. **Secrets 必须在 `wrangler deploy` 之前写入**，且不要事后单独 `wrangler secret put`（会生成仅含 secret、丢失 D1/KV/Assets 绑定的新版本导致 404）。
+3. **Secrets 必须在 `wrangler deploy` 之前写入**，且不要事后单独 `wrangler secret put`（会生成仅含 secret、丢失 D1/Assets 绑定的新版本导致 404）。
 
 4. **`skipDuplicates: true` 在 D1 不可用**（该连接器类型标为 `never`）。需要幂等插入时改用 `upsert`（含主键）或先经 `lastSucceededSourceDate` 等短路。
 
@@ -338,7 +331,7 @@ Dashboard > Workers > cs2-cfworker-inventory-simulator > Triggers > Custom Domai
 - **实时日志**: `wrangler tail`
 - **指标面板**: Dashboard > Workers > Metrics (请求数、CPU、错误率)
 - **D1 查询**: Dashboard > D1 > cs2-inventory-db > Console
-- **KV 查看**: Dashboard > Workers KV > cs2-inventory-kv
+- **缓存**: `UserCache` 表（equipped/inventory 持久化缓存）+ 进程内单例缓存（经济数据、viewer 投影）
 
 ## 💰 成本估算 (Cloudflare 免费额度)
 
@@ -349,8 +342,6 @@ Dashboard > Workers > cs2-cfworker-inventory-simulator > Triggers > Custom Domai
 | D1 读取 | 500 万行/天 | $0.001/百万行 |
 | D1 写入 | 50 万行/天 | $1.00/百万行 |
 | D1 存储 | 5 GB | $0.75/GB/月 |
-| KV 读取 | 100 万/天 | $0.50/百万 |
-| KV 写入 | 1 千/天 | $5.00/百万 |
 | Assets | 无限 | 免费 |
 
 **典型个人用量远在免费额度内**。
@@ -370,7 +361,7 @@ MIT License - 详见 [LICENSE](LICENSE)
 ## 🙏 致谢
 
 - [Ian Lucas](https://github.com/ianlucas) - 原版 cs2-inventory-simulator 作者
-- [Cloudflare](https://cloudflare.com) - Workers/D1/KV 平台
+- [Cloudflare](https://cloudflare.com) - Workers/D1 平台
 - [Prisma](https://prisma.io) - 类型安全 ORM
 - [React Router](https://reactrouter.com) - 全栈 React 框架
 

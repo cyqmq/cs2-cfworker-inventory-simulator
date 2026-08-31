@@ -10,7 +10,6 @@ DOMAIN="clc.ccwu.cc"
 SCRIPT="cs2-cfworker-inventory-simulator"
 D1_NAME=$(node -p "require('./package.json').cloudflare.d1.database_name")
 D1_ID=$(node -p "require('./package.json').cloudflare.d1.id")
-KV_ID=$(node -p "require('./package.json').cloudflare.kv.id")
 
 echo "🚀 部署 $ENV 环境 → $SCRIPT"
 
@@ -41,12 +40,6 @@ cat > wrangler.jsonc <<EOF
       "database_name": "$D1_NAME",
       "database_id": "$D1_ID",
       "migrations_dir": "./d1-migrations"
-    }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "CACHE",
-      "id": "$KV_ID"
     }
   ],
   "vars": {
