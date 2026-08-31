@@ -55,8 +55,7 @@ export async function syncEconomyPrices() {
               prisma.economyPrice.createMany({
                 data: prices
                   .slice(index, index + PRICE_INSERT_BATCH_SIZE)
-                  .map((price) => ({ ...price, sourceDate })),
-                skipDuplicates: true
+                  .map((price) => ({ ...price, sourceDate }))
               })
             );
           }

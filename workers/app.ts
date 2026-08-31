@@ -9,7 +9,7 @@ import type { ExportedHandler, KVNamespace, D1Database, Fetcher } from "@cloudfl
 import { setupTranslation } from "~/translation.server";
 
 declare global {
-  var ENV: Record<string, any> | undefined;
+  var ENV: Record<string, unknown> | undefined;
 }
 
 export interface Env {
@@ -29,7 +29,7 @@ const handleRequest = createRequestHandler<Env>({
 
 export default {
   async fetch(request, env, ctx) {
-    globalThis.ENV = env;
+    globalThis.ENV = env as unknown as Record<string, unknown>;
     setupTranslation();
 
     return handleRequest({

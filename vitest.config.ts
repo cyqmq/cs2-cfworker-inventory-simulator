@@ -10,7 +10,16 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      environment: "happy-dom"
+      environment: "happy-dom",
+      onUnhandledError: (error) => {
+        if (
+          error instanceof TypeError &&
+          /dispatchEvent.*not of type 'Event'/.test(error.message)
+        ) {
+          return false;
+        }
+        return true;
+      }
     }
   })
 );

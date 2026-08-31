@@ -28,8 +28,7 @@ export const loader = api(async ({ request }: Route.LoaderArgs) => {
   const where =
     search.length > 0
       ? {
-          name: { search },
-          id: { search }
+          OR: [{ name: { contains: search } }, { id: { contains: search } }]
         }
       : undefined;
   const count = await prisma.user.count({ where });

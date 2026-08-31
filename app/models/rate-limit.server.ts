@@ -35,9 +35,10 @@ export function refillAndConsume(
 }
 
 export async function consumeRateLimitToken(key: string, rateLimit: RateLimit) {
-  await prisma.rateLimitBucket.createMany({
-    data: { key, tokens: rateLimit.capacity, updatedAt: new Date() },
-    skipDuplicates: true
+  await prisma.rateLimitBucket.upsert({
+    create: { key, tokens: rateLimit.capacity, updatedAt: new Date() },
+    update: {},
+    where: { key }
   });
   const [bucket] = await prisma.$queryRaw<{ tokens: number; updatedAt: Date }[]>`
     SELECT "tokens", "updatedAt" FROM "RateLimitBucket" WHERE "key" = ${key}`;

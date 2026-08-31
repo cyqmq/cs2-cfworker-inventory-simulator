@@ -25,7 +25,8 @@ export default defineConfig({
     tsconfigPaths: true
   },
   plugins: [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
+    !process.env.VITEST &&
+      cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
     {
       name: "normalize-wasm-module",

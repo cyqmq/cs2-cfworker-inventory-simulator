@@ -5,11 +5,14 @@
 
 import { assert } from "@ianlucas/cs2-lib";
 
+// Env values are read dynamically from `globalThis`/`process` (injected by the
+// Cloudflare runtime), which requires `any` access.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 function getSource() {
   // Cloudflare Workers: env bindings are injected by the runtime. In dev and
   // production they are stored on the worker `vars`. We splice them onto
   // `globalThis.ENV` from `workers/app.ts`.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const workerEnv = (globalThis as any).ENV ?? {};
   const nodeEnv = (globalThis as any).process?.env ?? {};
   return {

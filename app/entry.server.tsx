@@ -15,7 +15,6 @@ import { ensureEconomyLoaded } from "./utils/economy-init.server";
 
 const ABORT_DELAY = 5_000;
 
-let started = false;
 let initPromise: Promise<void> | null = null;
 function startOnce() {
   if (initPromise) {
