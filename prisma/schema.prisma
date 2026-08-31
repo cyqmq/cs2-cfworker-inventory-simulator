@@ -4,9 +4,10 @@
 //--------------------------------------------------------------------------------------------*/
 
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
-  runtime  = "cloudflare"
+  provider      = "prisma-client"
+  output        = "../app/generated/prisma"
+  runtime       = "cloudflare"
+  compilerBuild = "small"
 }
 
 datasource db {
