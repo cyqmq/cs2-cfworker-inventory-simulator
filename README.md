@@ -89,10 +89,14 @@ git clone https://github.com/cyqmq/cs2-cfworker-inventory-simulator.git
 cd cs2-cfworker-inventory-simulator
 npm install
 wrangler login
+# 先 export 三个 Secret（deploy.sh 会在构建/部署前设置，避免丢失绑定）
+export SESSION_SECRET="$(openssl rand -base64 32)"
+export STEAM_API_KEY="你的 Steam Web API Key"
+export STEAM_CALLBACK_URL="https://clc.ccwu.cc/sign-in/steam/callback"
 ./deploy.sh production
 ```
 
-脚本自动创建 D1/KV、应用迁移、部署。
+脚本生成 `wrangler.jsonc`（与 CI 同一个 worker `cs2-cfworker-inventory-simulator`）、应用迁移、设置 Secrets、构建并部署到 `clc.ccwu.cc`。
 
 ### 手动部署 (分步了解)
 
@@ -272,9 +276,8 @@ STEAM_CALLBACK_URL=http://localhost:8788/sign-in/steam/callback
 ├── workers/
 │   └── app.ts               # Workers 入口 (导出 fetch handler)
 ├── d1-migrations/           # D1 迁移文件
-├── wrangler.jsonc           # 本地开发配置
-├── wrangler.production.jsonc # 生产环境模板
-├── deploy.sh                # 一键部署脚本
+├── wrangler.jsonc           # 本地开发配置（gitignore，CI 动态生成）
+├── deploy.sh                # 本地一键部署脚本（与 CI 共用同一 worker）
 └── package.json
 ```
 

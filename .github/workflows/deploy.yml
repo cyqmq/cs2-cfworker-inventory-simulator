@@ -5,14 +5,6 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-        - production
-        - preview
       d1_database_id:
         description: 'D1 数据库 ID（留空则用默认/Secrets，现有库 cs2-inventory-db 的 ID 为 b7653ae2-637e-409a-8578-9649e9abcf7b）'
         required: false
@@ -24,16 +16,18 @@ on:
         default: ''
         type: string
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   deploy:
     name: Deploy to Cloudflare Workers
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: ${{ github.event.inputs.environment || 'production' }}
 
     steps:
       - name: Checkout repository
@@ -47,11 +41,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
-
-      - name: Install Wrangler
-        run: npm install -g wrangler@4.127.1
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Authenticate with Cloudflare
         uses: cloudflare/wrangler-action@v3
@@ -131,24 +120,21 @@ jobs:
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
           STEAM_CALLBACK_URL: ${{ secrets.STEAM_CALLBACK_URL }}
         run: |
-          set -euo pipefail
-          SCRIPT="cs2-cfworker-inventory-simulator"
-          put_secret() {
-            [ -n "$2" ] || return 0
-            local payload
-            payload=$(python3 -c 'import json,sys; print(json.dumps({"type":"secret_text","name":sys.argv[1],"text":sys.argv[2]}))' "$1" "$2")
-            curl -sS -X PUT \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${SCRIPT}/secrets" \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -d "$payload" \
-              | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("success") else 1)' \
-                || { echo "failed to set secret $1"; exit 1; }
-            echo "secret $1 set"
-          }
-          put_secret SESSION_SECRET "$SESSION_SECRET"
-          put_secret STEAM_API_KEY "$STEAM_API_KEY"
-          put_secret STEAM_CALLBACK_URL "$STEAM_CALLBACK_URL"
+          python3 - "$SESSION_SECRET" "$STEAM_API_KEY" "$STEAM_CALLBACK_URL" /tmp/secrets.json <<'PY'
+          import json, sys
+          names = ["SESSION_SECRET", "STEAM_API_KEY", "STEAM_CALLBACK_URL"]
+          values = sys.argv[1:4]
+          json.dump(
+            [{"name": n, "text": v} for n, v in zip(names, values) if v],
+            open(sys.argv[4], "w")
+          )
+          PY
+          # 仅当有非空格密文时才写入
+          if [ -s /tmp/secrets.json ]; then
+            wrangler secret bulk /tmp/secrets.json --name cs2-cfworker-inventory-simulator
+          else
+            echo "无 Secret 需要设置"
+          fi
 
       - name: Deploy to Cloudflare Workers
         run: |
@@ -222,9 +208,8 @@ jobs:
           print("已重建 active deployment → 100% 指向完整绑定版本", candidate[:8])
           PY
 
-      - name: Comment deployment URL
+      - name: Print deployment URL
         if: github.event_name == 'push'
         run: |
-          WORKER_URL="https://cs2-cfworker-inventory-simulator.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev"
-          echo "🚀 部署完成！访问: $WORKER_URL"
-          echo "📝 别忘了在 Steam 应用管理页设置 Redirect URI: $WORKER_URL/sign-in/steam/callback"
+          echo "🚀 部署完成！访问: https://clc.ccwu.cc"
+          echo "📝 Steam 回调: https://clc.ccwu.cc/sign-in/steam/callback"
