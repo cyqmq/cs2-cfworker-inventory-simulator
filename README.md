@@ -27,21 +27,25 @@
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?repository-url=https://github.com/cyqmq/cs2-cfworker-inventory-simulator)
 
 **流程**：
-1. 点击上方按钮 → 授权 Cloudflare 访问 GitHub
-2. 选择 Fork 到你的账号 → 点击 "Deploy"
-3. Cloudflare 自动：
-   - ✅ 创建 D1 数据库 `cs2-inventory-db`
-   - ✅ 创建 KV 命名空间 `CACHE`
-   - ✅ 运行数据库迁移
-   - ✅ 构建并部署 Worker
-4. 部署完成后，在 **Settings > Variables** 添加 3 个 Secrets：
+1. Fork 本仓库到你的 GitHub 账号
+2. 点击上方按钮 → 授权 GitHub → 触发 **GitHub Actions 部署**（Deploy Button 与"方式 2"走同一条 `deploy.yml` 流水线）
+3. 部署流水线自动：
+   - ✅ 解析并绑定 D1 数据库（默认 `cs2-inventory-db`）与 KV 命名空间（默认 `cs2-inventory-kv`）
+   - ✅ 运行数据库迁移（`wrangler d1 migrations apply --remote`）
+   - ✅ 在 `wrangler deploy` **之前**通过 API 设置 Secrets
+   - ✅ 构建并部署 Worker，并将 `clc.ccwu.cc` 绑定为 custom domain
+   - ✅ 部署后校验 active deployment 含完整绑定（D1+KV+ASSETS+Secrets）
+4. 部署前需在 Fork 仓库 **Settings > Secrets and variables > Actions** 添加：
+   - `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`
    - `SESSION_SECRET` (随机 32+ 字符，`openssl rand -base64 32`)
-   - `STEAM_API_KEY` (你的 Steam Web API Key)
-   - `STEAM_CALLBACK_URL` (Worker 域名 + `/sign-in/steam/callback`)
-5. 在 Steam 应用管理页设置 Redirect URI 为你的 Worker 域名回调地址
+   - `STEAM_API_KEY`、`STEAM_CALLBACK_URL`（`https://your-domain.com/sign-in/steam/callback`）
+5. 在 Steam 应用管理页设置 Redirect URI 为 `https://your-domain.com/sign-in/steam/callback`
+
+> ⚠️ 部署流水线的 Secrets 会写入 Cloudflare 侧，**无需**再到 Dashboard 手动添加。
 
 ### 方式 2：Fork 后 GitHub Actions 自动部署 (推荐生产)
 
+与「方式 1」共用同一个 `deploy.yml`。流程：
 1. **Fork 本仓库** 到你的 GitHub
 2. 在 Fork 的仓库 **Settings > Secrets and variables > Actions** 添加：
    ```
@@ -51,16 +55,16 @@
    STEAM_API_KEY            # Steam Web API Key
    STEAM_CALLBACK_URL       # https://your-domain.com/sign-in/steam/callback
    ```
-3. **Settings > Pages > Build and deployment** 设置 Source 为 "GitHub Actions"
-4. 推送到 `main` 分支 → Actions 自动部署
+3. 推送到 `main` 分支 → Actions 自动部署
+4. 部署后访问 `https://clc.ccwu.cc`（如需换域名，修改 `deploy.yml` 的 custom domain 并更新 `STEAM_CALLBACK_URL` / D1 `steamCallbackUrl` Rule）
 
-### 🔑 必读：为什么 D1/KV 没有被自动创建/绑定？
+### 🔑 必读：D1/KV 绑定与 Secrets
 
-`deploy.yml` 通过**环境变量 / 部署界面输入**把 D1 与 KV 的 ID 注入绑定配置，绑定到 Worker：
+`deploy.yml` 通过 **环境变量 / Secrets / workflow_dispatch 输入** 把 D1 与 KV 的 ID 注入 `wrangler.jsonc` 绑定配置，然后执行 `wrangler deploy`。
 
 1. `workflow_dispatch` 手动触发时，在「Run workflow」界面填入 `d1_database_id` 和 `kv_namespace_id`（可用现有资源的 ID）
 2. 或在仓库 Secrets 配置 `D1_DATABASE_ID` / `KV_NAMESPACE_ID`（推荐，自动生效）
-3. 都不填时，使用默认值（本项目现有资源）生成带绑定的 `wrangler.deploy.jsonc`，应用 D1 迁移并部署 Worker
+3. 都不填时，使用项目默认值（`b7653ae2...` / `ee21da70...`）生成带完整绑定的 `wrangler.jsonc`，应用 D1 迁移并部署 Worker
 
 **ID 优先级**：工作流输入 > Secrets (`D1_DATABASE_ID` / `KV_NAMESPACE_ID`) > 默认值。
 
@@ -75,6 +79,8 @@
 运行 `npm run deploy:info` 可随时查看当前绑定的 D1/KV 名称与 ID，以及如何获取现有资源 ID。
 
 **配置后**，重新触发部署（重新 push 到 `main` 或手动 Re-run），即可用现有 D1 + KV 绑定并部署。
+
+> ⚠️ **不要在 `wrangler deploy` 之后单独执行 `wrangler secret put`！** 这会创建一个仅含 secret、丢失全部绑定（D1/KV/Assets）的新版本并成为 active，导致 404。Secrets 应在 `wrangler deploy` **之前**通过 API 或 deploy.yml 流水线写入。
 
 ### 方式 3：本地 CLI 部署 (开发调试)
 
@@ -95,41 +101,49 @@ wrangler login
 
 ```bash
 # 1. 创建 D1 数据库
-wrangler d1 create cs2-inventory-production
+wrangler d1 create cs2-inventory-db
 # 记下输出的 database_id
 
 # 2. 创建 KV 命名空间
-wrangler kv namespace create CACHE-production
-wrangler kv namespace create CACHE-production --preview
+wrangler kv namespace create cs2-inventory-kv
+wrangler kv namespace create cs2-inventory-kv --preview
 # 记下两个 id
 
-# 3. 复制并编辑 wrangler.production.jsonc
-cp wrangler.production.jsonc wrangler.jsonc
-# 填入 database_id, kv_id, preview_id
+# 3. 复制并编辑 wrangler.jsonc（填入 database_id, kv_id, preview_id）
+# 注意：wrangler.jsonc 已在 .gitignore 中，不会提交到仓库
 
 # 4. 应用迁移
-wrangler d1 migrations apply cs2-inventory-production --remote --yes
+wrangler d1 migrations apply cs2-inventory-db --remote --yes
 
-# 5. 设置 Secrets (不写入代码/配置文件)
+# 5. 设置 Secrets（⚠️ 必须在 wrangler deploy 之前完成！）
+#    单独的 wrangler secret put 会创建仅含 secret 的空绑定版本导致 404
+#    推荐使用 deploy.yml 流水线（自动处理顺序），或通过 API 批量写入
 wrangler secret put SESSION_SECRET
 wrangler secret put STEAM_API_KEY
 wrangler secret put STEAM_CALLBACK_URL
 
-# 6. 构建并部署
+# 6. 构建并部署（此时绑定已完整）
 npm run build
 wrangler deploy
+
+# 7. 部署后校验（可选）：确认 active deployment 含完整绑定
+curl -s "https://api.cloudflare.com/client/v4/accounts/{account_id}/workers/deployments" \
+  --header "Authorization: Bearer {api_token}" \
+  --data-urlencode "script_name=cs2-cfworker-inventory-simulator" | jq
 ```
 </details>
 
 ## ⚙️ 配置说明
 
-### 必需 Secrets (在 Cloudflare Dashboard 或 `wrangler secret put`)
+### 必需 Secrets (由 deploy.yml 在部署时写入 Cloudflare)
 
 | Secret | 说明 | 示例 |
 |--------|------|------|
 | `SESSION_SECRET` | 会话签名密钥，≥32 字符随机串 | `openssl rand -base64 32` |
-| `STEAM_API_KEY` | Steam Web API Key | `__STEAM_API_KEY_PLACEHOLDER__` |
-| `STEAM_CALLBACK_URL` | Steam 回调完整 URL (必须 HTTPS) | `https://your-domain.com/sign-in/steam/callback` |
+| `STEAM_API_KEY` | Steam Web API Key（最终生效值也存 D1 `Rule.steamApiKey`） | `__STEAM_API_KEY_PLACEHOLDER__` |
+| `STEAM_CALLBACK_URL` | Steam 回调完整 URL (必须 HTTPS)（最终生效值也存 D1 `Rule.steamCallbackUrl`） | `https://your-domain.com/sign-in/steam/callback` |
+
+> 注意：`STEAM_API_KEY` / `STEAM_CALLBACK_URL` 的**实际生效值由 D1 `Rule` 表决定**（存在时优先于 Secret）。需要改时同步更新 D1。
 
 ### 环境变量 (wrangler.jsonc vars)
 
@@ -162,6 +176,13 @@ wrangler deploy
 6. **同步**: 所有操作自动同步到云端 (右上角绿点表示同步中)
 
 ### Rule 配置 (运行时逻辑)
+
+最常改的两个运行配置也持久化在 D1 `Rule` 表（非 KV）：
+
+- `steamApiKey` —— Steam Web API Key
+- `steamCallbackUrl` —— Steam 回调地址（如 `https://clc.ccwu.cc/sign-in/steam/callback`）
+
+> ⚠️ Rule 表的值**优先于** env/Secret 默认值（`register()` 仅在无记录时写入 defaultValue）。所以改了 env/Secret 后如需生效，须同步 UPDATE D1 中对应的 Rule。
 
 无需重新部署即可调整游戏规则，通过 D1 `Rule` 表配置：
 
@@ -271,9 +292,9 @@ A: 已在代码中修复 - 所有 `$transaction(async (tx) => {...})` 改为 D1 
 ### Q: 如何重置/清空数据库？
 ```bash
 # 删除并重建 D1
-wrangler d1 delete cs2-inventory-production
-wrangler d1 create cs2-inventory-production
-wrangler d1 migrations apply cs2-inventory-production --remote --yes
+wrangler d1 delete cs2-inventory-db
+wrangler d1 create cs2-inventory-db
+wrangler d1 migrations apply cs2-inventory-db --remote --yes
 ```
 
 ### Q: 如何查看生产日志？
@@ -283,14 +304,21 @@ wrangler tail --format=pretty
 ```
 
 ### Q: 如何绑定自定义域名？
-Dashboard > Workers > cs2-cfworker-inventory-simulator > Triggers > Custom Domains > Add Custom Domain。
+Dashboard > Workers > cs2-cfworker-inventory-simulator > Triggers > Custom Domains > Add Custom Domain（本仓库为 `clc.ccwu.cc`，已在 `deploy.yml` 中通过 `routes` 的 `custom_domain` 自动绑定）。
+
+### Q: 登录时提示 "登录到 localhost"？
+应用回调地址（`steamCallbackUrl`）持久化在 D1 的 `Rule` 表中。若之前用 localhost 登录过，D1 中可能残留旧值。修正方式（任选其一）：
+- 直接 UPDATE D1：`UPDATE Rule SET value='https://clc.ccwu.cc/sign-in/steam/callback' WHERE name='steamCallbackUrl'`
+- 删除该记录让应用重新读取 env 默认值：`DELETE FROM Rule WHERE name='steamCallbackUrl'`
+
+> Steam 登录重定向验证：`curl -sI https://clc.ccwu.cc/sign-in | grep -i location` 应看到 `openid.return_to=https%3A%2F%2Fclc.ccwu.cc%2Fsign-in%2Fsteam%2Fcallback`。
 
 ## 📊 监控与调试
 
 - **实时日志**: `wrangler tail`
 - **指标面板**: Dashboard > Workers > Metrics (请求数、CPU、错误率)
-- **D1 查询**: Dashboard > D1 > cs2-inventory-production > Console
-- **KV 查看**: Dashboard > Workers KV > CACHE-production
+- **D1 查询**: Dashboard > D1 > cs2-inventory-db > Console
+- **KV 查看**: Dashboard > Workers KV > cs2-inventory-kv
 
 ## 💰 成本估算 (Cloudflare 免费额度)
 
