@@ -5,6 +5,7 @@
 
 import { RouterContextProvider } from "react-router";
 import { createRequestHandler } from "@react-router/cloudflare";
+import { setupTranslation } from "~/translation.server";
 
 declare global {
   var ENV: Record<string, any> | undefined;
@@ -21,6 +22,7 @@ const handleRequest = createRequestHandler({
 export default {
   async fetch(request, env, ctx) {
     globalThis.ENV = env;
+    setupTranslation();
 
     return handleRequest({
       request,
