@@ -72,7 +72,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Generate Prisma Types
         run: npx prisma generate
