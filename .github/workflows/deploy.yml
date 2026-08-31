@@ -106,7 +106,10 @@ jobs:
                 "id": "${{ steps.resources.outputs.kv_namespace_id }}"
               }
             ],
-            "vars": { "NODE_ENV": "production" }
+            "vars": { "NODE_ENV": "production" },
+            "routes": [
+              { "pattern": "clc.ccwu.cc", "custom_domain": true }
+            ]
           }
           EOF
 
