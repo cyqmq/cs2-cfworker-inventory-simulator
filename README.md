@@ -1,5 +1,7 @@
 # CS2 Inventory Simulator - Cloudflare Workers 版
 
+> 📦 **替代方案**：架构方向更换后的纯 JSON API 版见 [cs2-inventory-worker-api](https://github.com/cyqmq/cs2-inventory-worker-api)（Hono + Kysely，D1 / Hyperdrive+PostgreSQL）。
+
 > ## 🗄️ 仓库已归档（ARCHIVED）
 >
 > **本仓库已停止开发并归档。** 原因是该项目无法在 Cloudflare **免费版**资源配额下稳定运行，投入代码优化的性价比已不足以支撑继续维护。以下记录归档的真实原因与现状难点。
